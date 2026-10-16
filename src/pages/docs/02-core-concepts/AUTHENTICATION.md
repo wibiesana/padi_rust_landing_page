@@ -2,7 +2,7 @@
 
 ## 🛡️ Fortified Identity Management
 
-Security is the cornerstone of Padi Go REST API. Our Authentication system is built on industry-standard JSON Web Tokens (JWT) with HMAC SHA-256 signatures, stateless Bearer headers, and bcrypt password hashing.
+Security is a cornerstone of Padi Rust REST API. The Authentication system (`padi_core::auth`) is built on industry-standard JSON Web Tokens (JWT) with HMAC SHA-256 signatures, stateless Bearer headers, Bcrypt password hashing (`padi_core::hash`), and Axum request extractors (`AuthUser`).
 
 ---
 
@@ -11,8 +11,8 @@ Security is the cornerstone of Padi Go REST API. Our Authentication system is bu
 - [🛡️ Fortified Identity Management](#fortified-identity-management)
 - [⚡ Quick Start Flows](#quick-start-flows)
 - [🔑 Endpoints Specification](#endpoints-specification)
-- [🔍 JWT Validation & Context Injection](#jwt-validation--context-injection)
-- [🔒 Password Hashing (`auth.HashPassword`)](#password-hashing-authhashpassword)
+- [🔍 The `AuthUser` Extractor](#the-authuser-extractor)
+- [🔒 Password Hashing (`hash::make` & `hash::check`)](#password-hashing-hashmake--hashcheck)
 - [🛡️ Protecting Custom Endpoints](#protecting-custom-endpoints)
 
 ---
@@ -21,7 +21,7 @@ Security is the cornerstone of Padi Go REST API. Our Authentication system is bu
 
 ### 1. Register a New User
 ```bash
-curl -X POST http://localhost:8080/auth/register \
+curl -X POST http://127.0.0.1:8080/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "John Doe",
@@ -33,8 +33,8 @@ curl -X POST http://localhost:8080/auth/register \
 **Response (201 Created):**
 ```json
 {
-  "status": 201,
-  "success": true,
+  "code": 201,
+  "status": "CREATED",
   "message": "User registered successfully",
   "item": {
     "user": {
@@ -52,7 +52,7 @@ curl -X POST http://localhost:8080/auth/register \
 
 ### 2. Login
 ```bash
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://127.0.0.1:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "john@example.com",
@@ -63,8 +63,8 @@ curl -X POST http://localhost:8080/auth/login \
 **Response (200 OK):**
 ```json
 {
-  "status": 200,
-  "success": true,
+  "code": 200,
+  "status": "OK",
   "message": "Login successful",
   "item": {
     "user": {
@@ -82,15 +82,15 @@ curl -X POST http://localhost:8080/auth/login \
 
 ### 3. Call Protected Endpoint (`/auth/me`)
 ```bash
-curl -X GET http://localhost:8080/auth/me \
+curl -X GET http://127.0.0.1:8080/auth/me \
   -H "Authorization: Bearer <YOUR_JWT_TOKEN>"
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "status": 200,
-  "success": true,
+  "code": 200,
+  "status": "OK",
   "message": "User profile retrieved",
   "item": {
     "id": 1,
@@ -103,52 +103,64 @@ curl -X GET http://localhost:8080/auth/me \
 
 ---
 
-## 🔍 JWT Validation & Context Injection
+## 🔑 Endpoints Specification
 
-The `middleware.AuthRequired` middleware automatically validates incoming tokens and injects the authenticated user claims into the Go request `context.Context`:
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/auth/register` | Public | Register new user account |
+| `POST` | `/auth/login` | Public | Authenticate credentials and receive JWT |
+| `POST` | `/auth/refresh` | Bearer Token | Refresh expiring JWT token |
+| `POST` | `/auth/logout` | Bearer Token | Invalidate session client-side |
+| `GET` | `/auth/me` | Bearer Token | Retrieve currently authenticated user |
 
-```go
-func (c *UserController) GetProfile(w http.ResponseWriter, r *http.Request) {
-	// Extract user claims from context
-	claims, ok := r.Context().Value(middleware.UserContextKey).(*auth.JWTClaims)
-	if !ok || claims == nil {
-		response.Unauthorized(w, "Unauthenticated")
-		return
-	}
+---
 
-	userID := claims.UserID
-	userEmail := claims.Email
-	userRole := claims.Role
+## 🔍 The `AuthUser` Extractor
 
-	// ...
+In Padi Rust, simply adding `auth: AuthUser` to any controller handler signature automatically secures the endpoint. Axum intercepts the request, validates the Bearer token, and extracts the user claims. If the token is missing or invalid, it returns `401 Unauthorized` automatically:
+
+```rust
+use padi_core::prelude::*;
+
+pub async fn my_protected_handler(auth: AuthUser) -> ApiResult {
+    let user_id = auth.user_id().unwrap_or(0);
+    let role = auth.role().unwrap_or("user");
+
+    ok(json!({
+        "message": "Access granted",
+        "user_id": user_id,
+        "role": role
+    }))
 }
 ```
 
 ---
 
-## 🔒 Password Hashing (`auth.HashPassword`)
+## 🔒 Password Hashing (`hash::make` & `hash::check`)
 
-```go
-import "github.com/wibiesana/padi_go_core/auth"
+Padi Rust uses Bcrypt password hashing:
 
-// 1. Hash plain password
-hashed, err := auth.HashPassword("userSecretPassword")
+```rust
+use padi_core::hash;
 
-// 2. Verify hashed password
-isValid := auth.VerifyPassword(hashed, "userSecretPassword")
+// Hash plain-text password:
+let hashed = hash::make("userPassword123");
+
+// Verify password:
+let is_valid = hash::check("userPassword123", &hashed);
 ```
 
 ---
 
 ## 🛡️ Protecting Custom Endpoints
 
-In `app/Routes/api.go`:
+To require specific roles, use `auth.require_role`:
 
-```go
-r.Mux.Group(func(protected chi.Router) {
-	protected.Use(middleware.AuthRequired)
+```rust
+pub async fn admin_only_handler(auth: AuthUser) -> ApiResult {
+    // Returns 403 Forbidden if user is not admin
+    auth.require_role(&["admin"])?;
 
-	protected.Get("/admin/reports", reportCtrl.GetReports)
-	protected.Post("/admin/settings", settingsCtrl.SaveSettings)
-})
+    ok(json!({"admin_data": "secret stats"}))
+}
 ```

@@ -1,33 +1,31 @@
 # 🗄️ Multi-Database Support Guide
 
-Padi Go Framework seamlessly connects to SQLite, MySQL/MariaDB, and PostgreSQL.
+Padi Rust Framework seamlessly connects to **SQLite**, **MySQL/MariaDB**, and **PostgreSQL** using SQLx asynchronous connection pools.
 
 ---
 
 ## 📋 Database Configuration
 
-Configure your database connection in `.env`:
+Configure your database driver in `.env`:
 
 ```env
-# 1. SQLite (Native Go modernc.org/sqlite - no CGO required)
-DB_CONNECTION=sqlite
-DB_DATABASE=database/database.sqlite
+# 1. SQLite (Default embedded file database)
+DB_DRIVER=sqlite
+DB_DATABASE=database/app.db
 
-# 2. PostgreSQL (lib/pq)
-# DB_CONNECTION=postgres
+# 2. PostgreSQL
+# DB_DRIVER=pgsql
+# DATABASE_URL=postgres://user:password@127.0.0.1:5432/padi_db
+# Or individual fields:
 # DB_HOST=127.0.0.1
 # DB_PORT=5432
 # DB_DATABASE=padi_db
 # DB_USERNAME=postgres
 # DB_PASSWORD=secret
 
-# 3. MySQL / MariaDB (go-sql-driver/mysql)
-# DB_CONNECTION=mysql
-# DB_HOST=127.0.0.1
-# DB_PORT=3306
-# DB_DATABASE=padi_db
-# DB_USERNAME=root
-# DB_PASSWORD=secret
+# 3. MySQL / MariaDB
+# DB_DRIVER=mysql
+# DATABASE_URL=mysql://root:secret@127.0.0.1:3306/padi_db
 ```
 
 ---
@@ -36,22 +34,15 @@ DB_DATABASE=database/database.sqlite
 
 | Feature | SQLite | MySQL / MariaDB | PostgreSQL |
 | :--- | :---: | :---: | :---: |
-| **Driver Package** | `modernc.org/sqlite` | `go-sql-driver/mysql` | `lib/pq` |
-| **CGO Required** | ❌ No (Pure Go) | ❌ No | ❌ No |
-| **Auto Increment PK** | `INTEGER PRIMARY KEY` | `INT AUTO_INCREMENT` | `SERIAL PRIMARY KEY` |
-| **Parameter Placeholder** | `?` | `?` | `$1, $2, $3...` (Auto-converted by Query Builder) |
-| **Concurrency Mode** | WAL mode enabled | Connection Pool | Connection Pool |
+| **Driver Engine** | SQLx AnyPool | SQLx AnyPool | SQLx AnyPool |
+| **Default Location** | `database/app.db` | Server Host & Port | Server Host & Port |
+| **Primary Key Syntax** | `INTEGER PRIMARY KEY AUTOINCREMENT` | `INT AUTO_INCREMENT PRIMARY KEY` | `SERIAL PRIMARY KEY` |
+| **Concurrency Mode** | WAL mode enabled | Asynchronous connection pool | Asynchronous connection pool |
 
 ---
 
 ## ⚡ Cross-Database Query Builder Syntax
 
-The Padi Query Builder automatically adapts SQL syntax across engines (e.g. converting `?` placeholders to `$1, $2` for PostgreSQL automatically when executing queries).
-
-```go
-var users []models.User
-err := query.New("users").
-    Where("status", "active").
-    Limit(10).
-    All(&users)
-```
+The Padi Query Builder (`Query::table(...)`) and ActiveRecord ORM automatically handle driver nuances:
+- Placeholder syntax and quoting are handled consistently.
+- Schema introspection (`padi g <table_name>`) automatically switches between SQLite `PRAGMA table_info`, MySQL `information_schema.columns`, and PostgreSQL `information_schema.columns`.

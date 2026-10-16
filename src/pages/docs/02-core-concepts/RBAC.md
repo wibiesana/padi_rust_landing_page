@@ -1,150 +1,103 @@
 # 🎭 Role-Based Access Control (RBAC)
 
-## 🛡️ Granular Authorization & Security Orchestration
+## 🛡️ Granular Authorization & Role Enforcement
 
-Protect your API endpoints with surgical precision. Padi REST API’s Role-Based Access Control (RBAC) combines route-level middleware filtering with fine-grained context checks in Go.
+Padi Rust Framework provides a clean, ergonomic approach to Role-Based Access Control directly via the `AuthUser` extractor.
 
 ---
 
 ## 📋 Table of Contents
 
-- [🛡️ Granular Authorization & Security Orchestration](#granular-authorization--security-orchestration)
+- [🛡️ Granular Authorization & Role Enforcement](#granular-authorization--role-enforcement)
 - [📖 Overview](#overview)
-- [🎭 Route Protection via `middleware.RequireRole`](#route-protection-via-middlewarerequirerole)
-- [🛠️ Controller-Level Role & Ownership Verification](#controller-level-role--ownership-verification)
-- [⚠️ Error Responses](#error-responses)
+- [🎭 Enforcing Roles in Controllers (`require_role`)](#enforcing-roles-in-controllers-require_role)
+- [🛠️ Ownership Verification & Self-Data Checks](#ownership-verification--self-data-checks)
+- [⚠️ Error Responses (401 vs 403)](#error-responses-401-vs-403)
 - [⭐ Best Practices](#best-practices)
 
 ---
 
 ## 📖 Overview
 
-Padi Go Framework provides a streamlined approach to RBAC:
+In Padi Rust, the authenticated user is injected into handler functions using the `auth: AuthUser` extractor. The extractor provides role inspection methods:
 
-- ✅ **`middleware.RequireRole`** for route group protection.
-- ✅ **Request Context Claims** for user ID and role inspection.
-- ✅ **Owner-based access control** for self-data updates.
+- `auth.require_role(&["admin"])?`: Asserts that the authenticated user possesses one of the allowed roles. If not, returns `403 Forbidden` immediately via the `?` operator.
+- `auth.has_role(&["admin", "manager"])`: Checks if the user has any of the given roles, returning a boolean.
+- `auth.role()`: Returns the string role from the JWT payload (`Option<&str>`).
+- `auth.user_id()`: Returns the numeric user ID (`Option<i64>`).
 
 ---
 
-## 🎭 Route Protection via `middleware.RequireRole`
+## 🎭 Enforcing Roles in Controllers (`require_role`)
 
-In `app/Routes/api.go`:
+```rust
+use padi_core::prelude::*;
 
-```go
-package routes
+// Single role enforcement (Admin only)
+pub async fn delete_user(auth: AuthUser, Path(id): Path<i64>) -> ApiResult {
+    auth.require_role(&["admin"])?;
 
-import (
-	"github.com/go-chi/chi/v5"
-	"github.com/wibiesana/padi_go_core/middleware"
-	"github.com/wibiesana/padi_go_core/router"
-)
+    USERS.delete(id).await?;
+    no_content()
+}
 
-func RegisterRoutes(r *router.Router) {
-	// 1. Admin-only Route Group
-	r.Mux.Group(func(admin chi.Router) {
-		admin.Use(middleware.AuthRequired)
-		admin.Use(middleware.RequireRole("admin"))
+// Multi-role enforcement (Admin or Manager)
+pub async fn export_reports(auth: AuthUser) -> ApiResult {
+    auth.require_role(&["admin", "manager"])?;
 
-		admin.Get("/admin/stats", adminCtrl.GetStats)
-		admin.Delete("/admin/users/{id}", adminCtrl.DeleteUser)
-	})
-
-	// 2. Multi-role Route Group (Admin or Manager)
-	r.Mux.Group(func(management chi.Router) {
-		management.Use(middleware.AuthRequired)
-		management.Use(middleware.RequireRole("admin", "manager"))
-
-		management.Get("/reports", reportCtrl.GetReports)
-		management.Post("/products", productCtrl.Store)
-	})
+    ok(json!({"report": "Q3 Revenue Summary"}))
 }
 ```
 
 ---
 
-## 🛠️ Controller-Level Role & Ownership Verification
+## 🛠️ Ownership Verification & Self-Data Checks
 
-Inspect the user's claims directly inside your controller:
+When modifying sensitive profile data, verify whether the requester owns the account or has administrative privileges:
 
-```go
-package controllers
+```rust
+pub async fn update_user(
+    auth: AuthUser,
+    Path(id): Path<i64>,
+    Body(body): Body,
+) -> ApiResult {
+    // If the authenticated user is NOT the owner of the record, require admin role
+    if auth.user_id() != Some(id) {
+        auth.require_role(&["admin"])?;
+    }
 
-import (
-	"net/http"
+    let d = Validator::new(&body, &[
+        ("name", "sometimes|string|min:2|max:100"),
+    ]).validate().await?;
 
-	models "padi-template/app/Models"
-	"github.com/wibiesana/padi_go_core/activerecord"
-	"github.com/wibiesana/padi_go_core/auth"
-	"github.com/wibiesana/padi_go_core/middleware"
-	"github.com/wibiesana/padi_go_core/response"
-	"github.com/wibiesana/padi_go_core/router"
-	"github.com/wibiesana/padi_go_core/validator"
-)
-
-type UserController struct{}
-
-// Helper to extract claims from request context
-func (c *UserController) getClaims(r *http.Request) *auth.JWTClaims {
-	claims, _ := r.Context().Value(middleware.UserContextKey).(*auth.JWTClaims)
-	return claims
-}
-
-// Update Profile with Ownership Verification
-func (c *UserController) UpdateProfile(w http.ResponseWriter, r *http.Request) {
-	id, err := router.ParamUint(r, "id")
-	if err != nil {
-		response.BadRequest(w, "Invalid ID parameter")
-		return
-	}
-
-	claims := c.getClaims(r)
-	if claims == nil {
-		response.Unauthorized(w, "Authentication required")
-		return
-	}
-
-	// Allow only if user is Admin OR updating their own profile
-	if claims.Role != "admin" && claims.UserID != id {
-		response.Forbidden(w, "You can only update your own profile")
-		return
-	}
-
-	user, err := activerecord.Find[models.User](id)
-	if err != nil || user == nil {
-		response.NotFound(w, "User not found")
-		return
-	}
-
-	if errs, err := validator.BindJSON(r, user); err != nil {
-		response.UnprocessableEntity(w, errs, "Validation failed")
-		return
-	}
-
-	if err := activerecord.Save(user); err != nil {
-		response.InternalServerError(w, "Failed to update profile")
-		return
-	}
-
-	response.Item(w, user, "Profile updated successfully")
+    let updated = USERS.update(id, &d).await?;
+    ok(UserResource::wrap(&updated))
 }
 ```
 
 ---
 
-## ⚠️ Error Responses
+## ⚠️ Error Responses (401 vs 403)
 
-| HTTP Status | Message | Scenario |
-| :---: | :--- | :--- |
-| **401 Unauthorized** | `Authentication required` | Missing or invalid Bearer JWT token |
-| **403 Forbidden** | `Forbidden: insufficient permissions` | User role does not match required roles |
-| **403 Forbidden** | `You can only update your own profile` | Ownership check failed |
-| **404 Not Found** | `Resource not found` | Target entity does not exist |
+| Scenario | HTTP Status | Response Code | Description |
+| :--- | :--- | :--- | :--- |
+| **Missing or Invalid JWT Token** | `401 Unauthorized` | `UNAUTHORIZED` | Token was missing, expired, or failed cryptographic verification. |
+| **Insufficient Permissions** | `403 Forbidden` | `FORBIDDEN` | Valid token provided, but user lacks the required role. |
+
+### Forbidden Response Example:
+```json
+{
+  "code": 403,
+  "status": "FORBIDDEN",
+  "message": "Forbidden: Requires one of role(s): [\"admin\"]",
+  "execution_time": "0.62ms"
+}
+```
 
 ---
 
 ## ⭐ Best Practices
 
-1. **Defense in Depth**: Combine route-level `middleware.RequireRole` for coarse filtering with controller-level checks for fine-grained resource ownership.
-2. **Never Trust URL IDs blindly**: Always verify that the authenticated `claims.UserID` matches the entity's owner ID unless the user has an `admin` role.
-3. **Fail Closed**: Return `403 Forbidden` immediately if claims are missing or unauthorized.
+1. **Fail Closed:** Always perform authorization checks at the beginning of handler functions before any database reads or mutations.
+2. **Combine Ownership with Admin Override:** Allow administrators to manage user accounts while restricting ordinary users strictly to their own `user_id`.
+3. **Keep Roles Minimal:** Stick to clear, coarse-grained roles (`admin`, `manager`, `user`) in the JWT claims for optimal token size.

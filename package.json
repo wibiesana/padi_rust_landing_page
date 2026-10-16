@@ -5,8 +5,8 @@
     "type": "git",
     "url": "https://github.com/wibiesana/padi_go.git"
   },
-  "description": "The fastest way to build RESTful APIs with Go. Lean, powerful, and secure.",
-  "productName": "PADI REST API GO Framework",
+  "description": "The fastest way to build RESTful APIs with Rust. Lean, powerful, and secure.",
+  "productName": "Padi Rust Api Framework",
   "author": "Nur Santika Wibisana <wibiesana@yahoo.com>",
   "type": "module",
   "private": true,

@@ -15,7 +15,7 @@
               width="150px"
               height="150px"
               fit="contain"
-              alt="PADI REST API GO Framework Logo"
+              alt="Padi Rust Api Framework Logo"
             />
           </div>
           <h1
@@ -248,20 +248,20 @@
               <div class="t-line"><span class="t-dim"># 1. Clone template project</span></div>
               <div class="t-line">
                 <span class="t-prompt">$</span> <span class="t-cmd">git</span> clone
-                <span class="t-arg">https://github.com/wibiesana/padi_go.git</span> my-api
+                <span class="t-arg">https://github.com/wibiesana/padi_rust.git</span> my-api
               </div>
               <div class="t-line q-mt-md"><span class="t-dim"># 2. Interactive Setup Wizard (Database & JWT Config)</span></div>
               <div class="t-line">
                 <span class="t-prompt">$</span> <span class="t-cmd">cd</span> my-api &&
-                <span class="t-cmd">go</span> run cmd/padi/main.go init
+                <span class="t-cmd">padi</span> init <span class="t-dim"># or: cargo run -- init</span>
               </div>
               <div class="t-line q-mt-md"><span class="t-dim"># 3. Generate instant CRUD (Single table or all tables at once)</span></div>
               <div class="t-line">
-                <span class="t-prompt">$</span> <span class="t-cmd">go</span> run cmd/padi/main.go g <span class="t-arg">products</span> <span class="t-dim"># or: go run cmd/padi/main.go ga</span>
+                <span class="t-prompt">$</span> <span class="t-cmd">padi</span> g <span class="t-arg">products</span> <span class="t-dim"># or: padi ga</span>
               </div>
-              <div class="t-line q-mt-md"><span class="t-dim"># 4. Launch high-speed Go API server</span></div>
+              <div class="t-line q-mt-md"><span class="t-dim"># 4. Launch high-speed Rust API server</span></div>
               <div class="t-line">
-                <span class="t-prompt">$</span> <span class="t-cmd">go</span> run cmd/padi/main.go serve
+                <span class="t-prompt">$</span> <span class="t-cmd">padi</span> serve <span class="t-dim"># or: cargo run</span>
               </div>
               <div class="t-line q-mt-lg cursor-blink">_</div>
             </div>
@@ -361,17 +361,17 @@ import heroImage from 'assets/brand/padi_menunduk.png'
 import { APP_CONFIG } from 'src/constants'
 
 useMeta({
-  title: 'PADI REST API GO - Zero-Bloat Go (Golang) REST API Framework',
+  title: 'Padi Rust Api Framework - Zero-Bloat Rust REST API Framework',
   meta: {
     description: {
       name: 'description',
       content:
-        'Build secure, zero-bloat, and lightweight RESTful APIs in Go (Golang). High-performance generic ActiveRecord ORM, query builder, JWT authentication, and sub-millisecond execution.',
+        'Build secure, zero-bloat, and lightweight RESTful APIs in Rust. High-performance ActiveRecord ORM, Axum routing, Tokio async runtime, and sub-millisecond execution.',
     },
     keywords: {
       name: 'keywords',
       content:
-        'go rest api framework, golang rest api, lightweight go framework, golang web api, fastest go api, golang framework, zero dependency go framework, go active record orm, golang active record, building rest api in go, chi router go, jwt authentication golang, go microframework, golang boilerplate',
+        'rust rest api framework, rust rest api, lightweight rust framework, axum rest api, tokio web api, fastest rust api, rust framework, zero dependency rust framework, rust active record orm, axum router, jwt authentication rust, rust microframework, rust api boilerplate',
     },
   },
 })
@@ -550,16 +550,16 @@ function goToDocs(section) {
 
 function copySnippet() {
   const code = `# 1. Clone template project
-git clone https://github.com/wibiesana/padi_go.git my-api
+git clone https://github.com/wibiesana/padi_rust.git my-api
 
 # 2. Interactive Setup Wizard (Database, JWT, and Migrations)
-cd my-api && go run cmd/padi/main.go init
+cd my-api && padi init
 
 # 3. Generate instant CRUD (single table or all tables at once)
-go run cmd/padi/main.go g products # or: go run cmd/padi/main.go ga
+padi g products # or: padi ga
 
-# 4. Launch high-speed Go API server
-go run cmd/padi/main.go serve`
+# 4. Launch high-speed Rust API server
+padi serve # or: cargo run`
 
   navigator.clipboard.writeText(code).then(() => {
     $q.notify({
@@ -674,13 +674,13 @@ go run cmd/padi/main.go serve`
   border-radius: 10px;
   font-weight: 800;
   padding: 12px 42px;
-  background-color: #00ADD8;
-  color: #0b0f17;
+  background-color: #e05d44;
+  color: #ffffff;
   transition: all 0.2s ease;
   border: none;
   &:hover {
     transform: translateY(-2px);
-    background-color: #008bb0;
+    background-color: #c74d36;
   }
 }
 
@@ -693,8 +693,8 @@ go run cmd/padi/main.go serve`
   color: #f3f4f6;
   transition: all 0.2s ease;
   &:hover {
-    border-color: #00ADD8;
-    color: #00ADD8;
+    border-color: #e05d44;
+    color: #e05d44;
   }
 }
 
@@ -703,7 +703,7 @@ go run cmd/padi/main.go serve`
   transition: all 0.2s ease;
   background: #111827;
   &:hover {
-    border-color: #00ADD8;
+    border-color: #e05d44;
     background: #1f2937;
   }
 }
@@ -715,21 +715,21 @@ go run cmd/padi/main.go serve`
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: #00ADD8;
+    border-color: #e05d44;
   }
 }
 
 .h-line-gradient {
   height: 2px;
   width: 100px;
-  background-color: #00ADD8;
+  background-color: #e05d44;
 }
 
 /* Tab Active State Styling */
 :deep(.tab-active) {
   background: #1f2937 !important;
-  color: #00ADD8 !important;
-  border-left: 3px solid #00ADD8;
+  color: #e05d44 !important;
+  border-left: 3px solid #e05d44;
 }
 
 .code-container {
@@ -751,7 +751,7 @@ go run cmd/padi/main.go serve`
   height: 48px;
   border-radius: 50%;
   background: #1f2937;
-  color: #00ADD8;
+  color: #e05d44;
   font-weight: bold;
   font-size: 1.2rem;
   display: flex;
@@ -769,7 +769,7 @@ go run cmd/padi/main.go serve`
   border: 1px solid #1f2937;
   transition: all 0.3s ease;
   &:hover {
-    border-color: #00ADD8;
+    border-color: #e05d44;
     transform: translateY(-5px);
     .philosophy-watermark {
       opacity: 0.5;
@@ -784,7 +784,7 @@ go run cmd/padi/main.go serve`
   left: 15px;
   font-size: 130px;
   font-weight: 900;
-  color: #00ADD8;
+  color: #e05d44;
   opacity: 0.35;
   transition: all 0.3s ease;
   z-index: 0;
@@ -799,7 +799,7 @@ go run cmd/padi/main.go serve`
   .feature-icon-wrapper {
     width: 60px;
     height: 60px;
-    background: rgba(0, 173, 216, 0.1);
+    background: rgba(224, 93, 68, 0.1);
     border-radius: 16px;
     display: flex;
     align-items: center;
@@ -807,7 +807,7 @@ go run cmd/padi/main.go serve`
     transition: all 0.3s ease;
   }
   &:hover {
-    background: rgba(0, 173, 216, 0.08);
+    background: rgba(224, 93, 68, 0.08);
     border-color: var(--q-primary);
     transform: translateY(-10px);
     .feature-icon-wrapper {
@@ -828,7 +828,7 @@ go run cmd/padi/main.go serve`
   transition: all 0.3s ease;
   &:hover {
     border-color: var(--q-primary);
-    box-shadow: 0 0 30px rgba(0, 173, 216, 0.2);
+    box-shadow: 0 0 30px rgba(224, 93, 68, 0.2);
   }
 }
 
@@ -897,7 +897,7 @@ go run cmd/padi/main.go serve`
   line-height: 1.1;
 }
 .text-gradient {
-  color: #00ADD8 !important;
+  color: #e05d44 !important;
   background: none !important;
   -webkit-background-clip: initial !important;
   background-clip: initial !important;

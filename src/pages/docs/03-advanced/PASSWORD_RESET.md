@@ -2,7 +2,7 @@
 
 ## 🛡️ Secure, Token-Based Credential Recovery
 
-Padi Go Framework includes an out-of-the-box password recovery system using cryptographically random SHA-256 tokens and email dispatching.
+Padi Rust Framework supports secure password recovery workflows using cryptographically random tokens, expiration timestamps, Bcrypt hashing, and asynchronous email delivery.
 
 ---
 
@@ -11,7 +11,7 @@ Padi Go Framework includes an out-of-the-box password recovery system using cryp
 - [🛡️ Secure, Token-Based Credential Recovery](#secure-token-based-credential-recovery)
 - [🔄 Reset Lifecycle Flow](#reset-lifecycle-flow)
 - [📡 API Endpoints](#api-endpoints)
-- [🛠️ Password Reset Controller](#password-reset-controller)
+- [🛠️ Controller Implementation Example](#controller-implementation-example)
 - [🗂️ Database Migration](#database-migration)
 
 ---
@@ -23,7 +23,7 @@ Padi Go Framework includes an out-of-the-box password recovery system using cryp
       ↓
 [ Generate Token ] -> 64-char hex token saved in password_resets table (expires in 1 hr)
       ↓
-[ Send Email ] -> Email sent to user with reset link or token
+[ Send Email ] -> Email sent to user with reset link or token via Email::queue
       ↓
 [ Reset Password ] -> POST /auth/password/reset { email, token, password }
       ↓
@@ -34,10 +34,9 @@ Padi Go Framework includes an out-of-the-box password recovery system using cryp
 
 ## 📡 API Endpoints
 
-### 1. Request Reset Link / Token
-
+### 1. Request Reset Token (`POST /auth/password/forgot`)
 ```bash
-curl -X POST http://localhost:8080/auth/password/forgot \
+curl -X POST http://127.0.0.1:8080/auth/password/forgot \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com"
@@ -47,18 +46,18 @@ curl -X POST http://localhost:8080/auth/password/forgot \
 **Response (200 OK):**
 ```json
 {
-  "status": 200,
-  "success": true,
-  "message": "Password reset token sent to your email"
+  "code": 200,
+  "status": "OK",
+  "message": "Password reset instructions sent to your email",
+  "execution_time": "1.20ms"
 }
 ```
 
 ---
 
-### 2. Reset Password
-
+### 2. Reset Password (`POST /auth/password/reset`)
 ```bash
-curl -X POST http://localhost:8080/auth/password/reset \
+curl -X POST http://127.0.0.1:8080/auth/password/reset \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -70,69 +69,85 @@ curl -X POST http://localhost:8080/auth/password/reset \
 **Response (200 OK):**
 ```json
 {
-  "status": 200,
-  "success": true,
-  "message": "Password reset successfully. You can now login."
+  "code": 200,
+  "status": "OK",
+  "message": "Password reset successfully. You can now login.",
+  "execution_time": "1.15ms"
 }
 ```
 
 ---
 
-## 🛠️ Password Reset Controller
+## 🛠️ Controller Implementation Example
 
-Implementation located in `app/Controllers/PasswordResetController.go`:
+```rust
+use padi_core::{hash, prelude::*};
+use uuid::Uuid;
 
-```go
-package controllers
+pub async fn forgot_password(Body(body): Body) -> ApiResult {
+    let d = Validator::new(&body, &[("email", "required|email")]).validate().await?;
+    let email = d["email"].as_str().unwrap();
 
-import (
-	"crypto/rand"
-	"encoding/hex"
-	"net/http"
-	"time"
+    // Check if user exists
+    if let Some(_user) = USERS.find_query().where_eq("email", email).first().await? {
+        let token = Uuid::new_v4().to_string();
 
-	models "padi-template/app/Models"
-	"github.com/wibiesana/padi_go_core/activerecord"
-	"github.com/wibiesana/padi_go_core/email"
-	"github.com/wibiesana/padi_go_core/query"
-	"github.com/wibiesana/padi_go_core/response"
-	"github.com/wibiesana/padi_go_core/validator"
-)
+        // Save token in password_resets table
+        Database::execute(
+            "INSERT INTO password_resets (email, token, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+            &[Val::from(email), Val::from(token.as_str())],
+        ).await?;
 
-type PasswordResetController struct{}
+        // Dispatch email via background queue
+        Email::queue(
+            email,
+            "Reset Your Password",
+            &format!("<p>Your password reset token is: <b>{}</b></p>", token),
+            &[],
+        ).await?;
+    }
 
-func (c *PasswordResetController) ForgotPassword(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		Email string `json:"email" validate:"required,email"`
-	}
-	if errs, err := validator.BindJSON(r, &input); err != nil {
-		response.UnprocessableEntity(w, errs, "Validation failed")
-		return
-	}
+    ok_msg(json!({}), "Password reset instructions sent to your email")
+}
 
-	user, err := activerecord.FindBy[models.User]("email", input.Email)
-	if err != nil || user == nil {
-		// Do not leak email existence; return success message
-		response.Success(w, nil, "If the email is registered, a reset token has been sent.")
-		return
-	}
+pub async fn reset_password(Body(body): Body) -> ApiResult {
+    let d = Validator::new(
+        &body,
+        &[
+            ("email", "required|email"),
+            ("token", "required|string"),
+            ("password", "required|string|min:8"),
+        ],
+    ).validate().await?;
 
-	// Generate secure token
-	tokenBytes := make([]byte, 32)
-	rand.Read(tokenBytes)
-	token := hex.EncodeToString(tokenBytes)
+    let email = d["email"].as_str().unwrap();
+    let token = d["token"].as_str().unwrap();
+    let new_password = d["password"].as_str().unwrap();
 
-	// Save token
-	_, _ = query.New("password_resets").Insert(map[string]interface{}{
-		"email":      input.Email,
-		"token":      token,
-		"created_at": time.Now(),
-	})
+    // Verify token
+    let record = Database::fetch_one(
+        "SELECT email FROM password_resets WHERE email = ? AND token = ?",
+        &[Val::from(email), Val::from(token)],
+    ).await?;
 
-	// Dispatch email
-	_ = email.Send(input.Email, "Reset Password Token", "Your reset token is: "+token)
+    if record.is_none() {
+        return Err(ApiError::bad_request("Invalid or expired reset token"));
+    }
 
-	response.Success(w, nil, "Password reset token sent to your email")
+    // Update password in database
+    let hashed = hash::make(new_password);
+    Database::execute(
+        "UPDATE users SET password = ? WHERE email = ?",
+        &[Val::from(hashed), Val::from(email)],
+    ).await?;
+
+    // Delete used token
+    Database::execute(
+        "DELETE FROM password_resets WHERE email = ?",
+        &[Val::from(email)],
+    ).await?;
+
+    ok_msg(json!({}), "Password reset successfully. You can now login.")
 }
 ```
 
@@ -141,10 +156,9 @@ func (c *PasswordResetController) ForgotPassword(w http.ResponseWriter, r *http.
 ## 🗂️ Database Migration
 
 ```sql
-CREATE TABLE password_resets (
+CREATE TABLE IF NOT EXISTS password_resets (
     email VARCHAR(255) NOT NULL,
     token VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP NULL
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_password_resets_email ON password_resets (email);
 ```

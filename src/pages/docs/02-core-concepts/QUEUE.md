@@ -1,36 +1,41 @@
 # ⏳ Queue System Guide
 
-The Padi Queue System enables asynchronous execution of long-running tasks such as sending emails, image resizing, or third-party webhooks.
+The Padi Queue System (`padi_core::queue::Queue`) enables asynchronous, non-blocking execution of long-running tasks such as transactional email dispatching, webhook delivery, and background data processing.
+
+---
+
+## 📋 Architecture
+
+- **Database-Backed:** Runs over your existing database connection (SQLite, PostgreSQL, or MySQL) via a lightweight `jobs` table.
+- **Zero Extra Infrastructure:** No external message broker (like Redis or RabbitMQ) required.
+- **Worker Controls:** Supports max attempts, retry backoff, graceful termination, and queue filtering.
 
 ---
 
 ## 🚀 1. Registering a Job Handler
 
-Register handlers using `queue.RegisterJobHandler`:
+Register asynchronous job handlers using `Queue::register`:
 
-```go
-package main
+```rust
+use padi_core::prelude::*;
 
-import (
-	"encoding/json"
-	"log"
+pub fn register_queue_jobs() {
+    Queue::register("SendWelcomeEmail", |payload| Box::pin(async move {
+        let email = payload["email"].as_str().unwrap_or("");
+        let name = payload["name"].as_str().unwrap_or("");
 
-	"github.com/wibiesana/padi_go_core/queue"
-)
+        println!("Sending welcome email to {} <{}>...", name, email);
 
-func init() {
-	queue.RegisterJobHandler("SendWelcomeEmail", func(payload []byte) error {
-		var data struct {
-			Email string `json:"email"`
-			Name  string `json:"name"`
-		}
-		if err := json.Unmarshal(payload, &data); err != nil {
-			return err
-		}
+        // Send actual email via Email helper
+        Email::send(
+            email,
+            "Welcome to Padi!",
+            &format!("<h1>Welcome, {}!</h1>", name),
+            &[],
+        ).await?;
 
-		log.Printf("Sending email to %s <%s>...", data.Name, data.Email)
-		return nil
-	})
+        Ok(())
+    }));
 }
 ```
 
@@ -38,28 +43,46 @@ func init() {
 
 ## 📤 2. Pushing Jobs to Queue
 
-Push jobs from any controller or action:
+Push jobs into the queue from any controller or service:
 
-```go
-func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
-    // ... create user ...
+```rust
+use padi_core::prelude::*;
 
-    // Push background job
-    _ = queue.Push("SendWelcomeEmail", map[string]string{
-        "email": user.Email,
-        "name":  user.Name,
-    }, "emails")
+pub async fn register(Body(body): Body) -> ApiResult {
+    // ... validate and create user ...
+    let user = USERS.create(&body).await?;
 
-    response.Created(w, user, "User registered successfully")
+    // Push job to default queue:
+    Queue::push("SendWelcomeEmail", &json!({
+        "email": user["email"],
+        "name": user["name"]
+    })).await?;
+
+    // Or push with delay (e.g. 60 seconds):
+    Queue::push_delayed("SendWelcomeEmail", &json!({
+        "email": user["email"]
+    }), 60).await?;
+
+    created(UserResource::wrap(&user))
 }
 ```
 
 ---
 
-## 👷 3. Processing Jobs
+## 👷 3. Processing Jobs via CLI
 
-Run the queue worker daemon:
+Start the background worker loop using the `padi` CLI or Cargo:
 
 ```bash
-go run cmd/padi/main.go queue:work emails
+# Process jobs continuously on default queue:
+padi queue:work
+
+# Process jobs on a specific named queue:
+padi queue:work emails
+
+# Process exactly one job and exit:
+padi queue:work --once
+
+# Stop when all pending jobs have been processed:
+padi queue:work --stop-when-empty
 ```

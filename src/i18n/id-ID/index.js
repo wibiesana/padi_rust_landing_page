@@ -13,8 +13,8 @@ export default {
   },
   // Hero Section
   hero: {
-    title: 'PADI REST API GO',
-    subtitle: 'Framework REST API Go Kelas Industri yang Ringan Tanpa Bloat untuk Web Modern',
+    title: 'Padi Rust Api Framework',
+    subtitle: 'Framework REST API Rust Kelas Industri yang Ringan Tanpa Bloat untuk Web Modern',
     getStarted: 'Mulai Sekarang',
     documentation: 'Dokumentasi'
   },
@@ -24,20 +24,20 @@ export default {
     titleSpeed: 'Kecepatan',
     title2: 'Diskalakan untuk Pertumbuhan',
     titleIndustrial: 'Industri',
-    desc: 'PADI REST API GO bukan sekadar framework biasa; ini adalah mesin generator REST API yang dirancang dengan cermat untuk mengubah skema database Anda menjadi layanan RESTful siap produksi secara instan.',
+    desc: 'Padi Rust Api Framework bukan sekadar framework biasa; ini adalah mesin generator REST API yang dirancang dengan cermat untuk mengubah skema database Anda menjadi layanan RESTful siap produksi secara instan dengan Rust.',
     readBtn: 'Baca filosofi →',
     items: {
       p: {
         t: 'Performa Tinggi (Performant)',
-        d: 'Inti eksekusi yang sangat teroptimasi untuk memeras setiap tetes kecepatan dari arsitektur Go modern.'
+        d: 'Inti eksekusi yang sangat teroptimasi untuk memeras setiap tetes kecepatan, memory safety, dan konkurensi dari arsitektur Rust modern.'
       },
       a: {
         t: 'Lincah (Agile)',
-        d: 'Hasilkan endpoint CRUD lengkap, validasi, dan resource dalam hitungan detik menggunakan generator CLI kami.'
+        d: 'Hasilkan endpoint CRUD lengkap, validasi, model, resource, dan route dalam hitungan detik menggunakan generator CLI kami.'
       },
       d: {
         t: 'Dapat Diandalkan (Dependable)',
-        d: 'Arsitektur concurrent-safe yang tangguh yang berkembang di bawah beban kerja konkurensi tinggi.'
+        d: 'Arsitektur memory-safe yang tangguh yang berkembang di bawah beban kerja konkurensi tinggi.'
       },
       i: {
         t: 'Intuitif (Intuitive)',
@@ -52,36 +52,36 @@ export default {
     performanceTag: 'Performa Tinggi',
     items: {
       routing: {
-        t: 'Routing Chi Zero-Allocation',
-        d: 'Mendukung middleware global/grup, parameter dinamis, dan pencarian cepat O(1) berbasis radix tree.'
+        t: 'Routing Cepat Axum',
+        d: 'Dibangun di atas Axum dengan rute modular, middleware kelompok, dan extractor type-safe.'
       },
       orm: {
-        t: 'ActiveRecord Generic ORM',
-        d: 'Type-safe generics dengan Find[T], All[T], Paginate[T], relasi, dan hook daur hidup BeforeSave/AfterSave.'
+        t: 'ActiveRecord Multi-DB ORM',
+        d: 'Model konstan saat kompilasi, eager loading, introspeksi skema database, dan lifecycle hooks dengan SQLx.'
       },
       middleware: {
         t: 'Pipeline Middleware',
-        d: 'Intercept request dengan mudah. Dilengkapi dengan middleware bawaan untuk Auth, CORS, Recoverer, dan Rate Limiting.'
+        d: 'Intercept request dengan mudah. Dilengkapi dengan layer Tower bawaan untuk Auth, CORS, Recoverer, dan Kompresi.'
       },
       queue: {
         t: 'Sistem Antrean Terintegrasi',
-        d: 'Jalankan pekerjaan latar belakang yang memakan waktu lama secara asinkron menggunakan worker queue bawaan.'
+        d: 'Jalankan pekerjaan latar belakang yang memakan waktu lama secara asinkron menggunakan worker queue berbasis database.'
       },
       cache: {
-        t: 'Caching In-Memory & Redis',
-        d: 'Tingkatkan performa kueri dengan thread-safe in-memory cache dan remember closure minim alokasi memori.'
+        t: 'Sistem Caching Dua Tingkat',
+        d: 'Tingkatkan performa kueri dengan L1 in-memory cache dan L2 penyimpanan file ber-hash SHA-256.'
       },
       auth: {
-        t: 'Autentikasi JWT Stateless',
-        d: 'Keamanan token stateless Bearer JWT dan hashing kata sandi Bcrypt terintegrasi.'
+        t: 'Autentikasi JWT & RBAC',
+        d: 'Keamanan token stateless Bearer JWT dengan extractor AuthUser dan hashing kata sandi Bcrypt terintegrasi.'
       },
       cli: {
         t: 'CLI Generator Kuat',
-        d: 'Generator kode interaktif untuk menghasilkan CRUD lengkap (Model, Controller, Resource, Route) secara instan.'
+        d: 'Generator kode interaktif untuk menghasilkan CRUD lengkap (Model, Controller, Resource, Route) dalam satu perintah (padi g / padi ga).'
       },
       validation: {
         t: 'Validasi Input Ketat',
-        d: 'Mesin validasi tag struct tangguh dengan aturan lengkap dan error handling terstruktur.'
+        d: 'Mesin validasi tangguh dengan aturan lengkap, pengecekan database unik, dan error handling terstruktur.'
       },
       response: {
         t: 'Resource & Respon Otomatis',
@@ -93,7 +93,7 @@ export default {
   stats: {
     title: 'METRIK PERFORMA',
     subtitle: 'Teknik Presisi.',
-    desc: 'Dioptimalkan untuk container cloud-native dan klaster enterprise. Framework kami menghasilkan skor keamanan industri terbaik tanpa mengorbankan kecepatan eksekusi.',
+    desc: 'Dioptimalkan untuk container cloud-native dan binary kompilasi native. Framework kami menghasilkan throughput tinggi tanpa pemborosan memori.',
     securityScore: 'Skor Keamanan',
     performance: 'Performa'
   },
@@ -106,12 +106,12 @@ export default {
   quickStart: {
     title1: 'Mulai Jalankan',
     title2: 'Secara Instan',
-    desc: 'Tanpa wizard instalasi yang rumit. Cukup clone starter template dan mulai membangun arsitektur Anda.',
+    desc: 'Tanpa setup yang rumit. Cukup clone starter template, migrate, dan mulai membangun arsitektur Anda.',
     steps: [
-      'Clone Template Go Starter',
-      'Setup Wizard Interaktif (Pilih Database & JWT)',
-      'Generate CRUD Instan dari Tabel (Scaffolding)',
-      'Jalankan Server Go'
+      'Clone Template Rust Starter',
+      'Setup Wizard Interaktif (padi init)',
+      'Generate CRUD Instan dari Tabel (padi g <table_name>)',
+      'Jalankan Server Rust (padi serve)'
     ]
   },
   // Learning Paths Section
@@ -122,10 +122,10 @@ export default {
     paths: {
       basics: {
         t: 'Konsep Dasar',
-        d: 'Kuasai dasar-dasar PADI REST API GO dan bangun endpoint RESTful pertama Anda.',
+        d: 'Kuasai dasar-dasar Padi Rust Api Framework dan bangun endpoint RESTful pertama Anda.',
         steps: [
           'Pengenalan & Instalasi',
-          'Routing & Penanganan Request',
+          'Routing & Penanganan Request Axum',
           'Database & Query Builder',
           'Validasi Input Dasar'
         ]
@@ -144,9 +144,9 @@ export default {
         t: 'Penyebaran Produksi',
         d: 'Konfigurasikan dan optimalkan server Anda untuk kinerja maksimal di dunia nyata.',
         steps: [
-          'Kompilasi Binary Ringan',
-          'Konfigurasi PostgreSQL / MySQL',
-          'Setup Docker Multi-stage (<25MB)',
+          'Kompilasi Binary Release (cargo build --release)',
+          'Konfigurasi PostgreSQL / MySQL / SQLite',
+          'Setup Docker Multi-stage',
           'Penyetelan Keamanan & Nginx Reverse Proxy'
         ]
       }
@@ -156,7 +156,7 @@ export default {
   cta: {
     title1: 'Siap Merasakan',
     title2: 'Kekuatan Murni?',
-    desc: 'Bergabunglah dengan ekosistem engineer yang membangun layanan REST industri dengan Go. Berhenti bergelut, mulai rilis produk Anda.',
+    desc: 'Bergabunglah dengan ekosistem engineer yang membangun layanan REST industri dengan Rust. Berhenti bergelut, mulai rilis produk Anda.',
     installBtn: 'Instal Framework'
   }
 }

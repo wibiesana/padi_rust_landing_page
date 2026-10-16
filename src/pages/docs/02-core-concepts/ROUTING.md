@@ -1,107 +1,123 @@
 # 🛣️ Routing Guide
 
-Padi Go Framework uses the ultra-fast, zero-allocation **Chi Router** under the hood. All routes are registered directly without forced version prefixes.
+Padi Rust Framework uses **Axum Router** powered by Tokio and Tower under the hood. All routes are modular, zero-cost, and type-safe.
 
 ---
 
 ## 📋 Table of Contents
 
-- [🚀 Direct Route Registration](#direct-route-registration)
+- [🚀 Route Registration Architecture](#route-registration-architecture)
 - [📦 Resource Routing](#resource-routing)
-- [🛡️ Middleware & Route Groups](#middleware--route-groups)
-- [🔀 URL Parameters](#url-parameters)
-- [📡 Realtime & Static File Serving](#realtime--static-file-serving)
+- [🛡️ Route Nesting & Groups](#route-nesting--groups)
+- [🔀 Path Parameters](#path-parameters)
+- [📡 Realtime SSE & Static Serving](#realtime-sse--static-serving)
 
 ---
 
-## 🚀 Direct Route Registration
+## 🚀 Route Registration Architecture
 
-Routes are configured in `app/Routes/api.go`:
+In Padi Rust, the main router is defined in `src/routes/mod.rs` and composed using nested sub-routers:
 
-```go
-package routes
+```rust
+// src/routes/mod.rs
+use padi_core::prelude::*;
 
-import (
-	"net/http"
+mod auth;
+mod site;
+mod users;
+mod products;
 
-	controllers "padi-template/app/Controllers"
-	"github.com/wibiesana/padi_go_core/middleware"
-	"github.com/wibiesana/padi_go_core/response"
-	"github.com/wibiesana/padi_go_core/router"
-	"github.com/go-chi/chi/v5"
-)
-
-func RegisterRoutes(r *router.Router) {
-	// Root / Health check
-	r.Mux.Get("/", func(w http.ResponseWriter, req *http.Request) {
-		response.Success(w, map[string]string{"status": "running"}, "Welcome to Padi Go REST API 🌾")
-	})
-
-	// Public Auth Endpoints
-	authCtrl := controllers.NewAuthController()
-	r.Mux.Route("/auth", func(auth chi.Router) {
-		auth.Post("/register", authCtrl.Register)
-		auth.Post("/login", authCtrl.Login)
-
-		// Protected Auth Endpoints
-		auth.Group(func(protected chi.Router) {
-			protected.Use(middleware.AuthRequired)
-			protected.Get("/me", authCtrl.Me)
-		})
-	})
+pub fn api() -> Router {
+    Router::new()
+        .merge(site::routes())
+        .nest("/auth", auth::routes())
+        .nest("/users", users::routes())
+        .nest("/products", products::routes())
 }
+```
+
+The router is mounted into the application in `src/main.rs`:
+```rust
+Application::new(root, routes::api()).run().await
 ```
 
 ---
 
 ## 📦 Resource Routing
 
-Mounting full RESTful CRUD routes:
+Each resource defines its routes in `src/routes/<resource>.rs`:
 
-```go
-userCtrl := controllers.NewUserController()
+```rust
+// src/routes/products.rs
+use padi_core::prelude::*;
+use crate::controllers::products;
 
-r.Mux.Route("/users", func(r chi.Router) {
-	r.Get("/", userCtrl.Index)        // GET /users (Paginated -> 'items' & 'meta')
-	r.Get("/all", userCtrl.All)      // GET /users/all (All -> 'items')
-	r.Post("/", userCtrl.Store)      // POST /users (Create -> 'item')
-	r.Get("/{id}", userCtrl.Show)    // GET /users/{id} (Show -> 'item')
-	r.Put("/{id}", userCtrl.Update)  // PUT /users/{id} (Update -> 'item')
-	r.Delete("/{id}", userCtrl.Destroy) // DELETE /users/{id} (Delete)
-})
-```
-
----
-
-## 🛡️ Middleware & Route Groups
-
-Apply middleware to specific groups easily:
-
-```go
-r.Mux.Group(func(admin chi.Router) {
-	admin.Use(middleware.AuthRequired)
-
-	admin.Get("/admin/stats", adminCtrl.GetStats)
-	admin.Post("/admin/settings", adminCtrl.UpdateSettings)
-})
-```
-
----
-
-## 🔀 URL Parameters
-
-Extract parameters using `router.Param` helpers:
-
-```go
-func (c *ArticleController) Show(w http.ResponseWriter, r *http.Request) {
-	// Extract numeric ID
-	id, err := router.ParamUint(r, "id")
-	if err != nil {
-		response.BadRequest(w, "Invalid ID parameter")
-		return
-	}
-
-	// Extract string slug
-	slug := router.Param(r, "slug")
+pub fn routes() -> Router {
+    Router::new()
+        .route("/", get(products::index).post(products::store))
+        .route("/all", get(products::all))
+        .route("/{id}", get(products::show).put(products::update).delete(products::destroy))
 }
 ```
+
+This maps standard REST operations cleanly:
+- `GET /products`: `products::index` (paginated collection)
+- `GET /products/all`: `products::all` (unpaginated list)
+- `POST /products`: `products::store` (create record)
+- `GET /products/{id}`: `products::show` (single record)
+- `PUT /products/{id}`: `products::update` (update record)
+- `DELETE /products/{id}`: `products::destroy` (delete record)
+
+---
+
+## 🛡️ Route Nesting & Groups
+
+You can group routes under prefixes or API versions using Axum or `RouterExt`:
+
+```rust
+use padi_core::prelude::*;
+
+// Using standard Axum nesting:
+Router::new()
+    .nest("/api/v1", api_v1_routes)
+
+// Or using Padi RouterExt:
+Router::new()
+    .version("v1", |r| {
+        r.nest("/users", users::routes())
+         .nest("/products", products::routes())
+    })
+```
+
+---
+
+## 🔀 Path Parameters
+
+Path parameters are matched with `{param_name}` in the route definition and extracted with `Path(val): Path<T>`:
+
+```rust
+// Route definition
+.route("/{id}", get(show_handler))
+
+// Handler function:
+pub async fn show_handler(Path(id): Path<i64>) -> ApiResult {
+    let item = PRODUCTS.find_or_fail(id).await?;
+    ok(ProductResource::wrap(&item))
+}
+```
+
+---
+
+## 📡 Realtime SSE & Static Serving
+
+Padi provides built-in handlers for Realtime Server-Sent Events (SSE):
+
+```rust
+use padi_core::prelude::*;
+
+// In your router:
+Router::new()
+    .route("/realtime", get(Realtime::sse_handler))
+```
+
+Clients can subscribe to topics via `http://localhost:8080/realtime?topic=orders`.

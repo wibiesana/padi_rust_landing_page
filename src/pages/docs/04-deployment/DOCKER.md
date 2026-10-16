@@ -1,40 +1,45 @@
 # 🐳 Docker Deployment Guide
 
-Deploying Padi Go applications with Docker results in ultra-compact images (< 25MB) using multi-stage builds.
+Deploying Padi Rust applications with Docker results in ultra-compact, high-performance container images using multi-stage builds.
 
 ---
 
 ## 📄 Dockerfile
 
 ```dockerfile
-# Stage 1: Build the Go binary
-FROM golang:1.22-alpine AS builder
+# Stage 1: Build the Rust release binary
+FROM rust:1.75-bullseye AS builder
 
 WORKDIR /app
 
 # Cache dependencies
-COPY go.mod go.sum ./
-RUN go mod download
+COPY Cargo.toml Cargo.lock ./
+# Create dummy main to compile dependencies first
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+RUN rm -rf src
 
-# Copy source code
-COPY . .
+# Copy real source code and migrations
+COPY src ./src
+COPY database ./database
 
-# Build static binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/padi-server cmd/padi/main.go
+# Build release binary (updates real src)
+RUN touch src/main.rs && cargo build --release
 
 # Stage 2: Minimal runtime image
-FROM alpine:latest
+FROM debian:bullseye-slim
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apt-get update && apt-get install -y ca-certificates libssl-dev tzdata && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /root/
+WORKDIR /app
 
-COPY --from=builder /app/padi-server .
-COPY --from=builder /app/.env.example .env
+COPY --from=builder /app/target/release/padi_rust /app/padi_rust
+COPY --from=builder /app/database /app/database
+COPY .env.example /app/.env
 
 EXPOSE 8080
 
-CMD ["./padi-server", "serve"]
+CMD ["./padi_rust", "serve"]
 ```
 
 ---
@@ -52,12 +57,9 @@ services:
     environment:
       - APP_ENV=production
       - APP_PORT=8080
-      - DB_CONNECTION=postgres
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_DATABASE=padi_db
-      - DB_USERNAME=padi_user
-      - DB_PASSWORD=secret
+      - DB_DRIVER=pgsql
+      - DATABASE_URL=postgres://padi_user:secret@postgres:5432/padi_db
+      - JWT_SECRET=change-this-to-a-cryptographically-secure-32-character-secret
     depends_on:
       - postgres
 

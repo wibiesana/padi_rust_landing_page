@@ -1,96 +1,78 @@
 # 🛡️ Middleware Guide
 
-## 🛣️ Standard HTTP Interception
+## 🛣️ Tower & Axum Middleware Architecture
 
-Middleware in Padi Go Framework uses the idiomatic Go `func(next http.Handler) http.Handler` signature. It seamlessly integrates with the Chi router for global, group, and route-level filtering.
+Middleware in Padi Rust Framework leverages the battle-tested **Tower** and **Axum** middleware ecosystem. It intercepts, validates, and transforms HTTP requests and responses globally or on specific routes.
 
 ---
 
 ## 📋 Table of Contents
 
-- [🛣️ Standard HTTP Interception](#standard-http-interception)
-- [🛠️ Writing Custom Middleware](#writing-custom-middleware)
-- [📍 Registering Middleware](#registering-middleware)
-  - [Global Middleware](#global-middleware)
-  - [Route Group Middleware](#route-group-middleware)
-- [📦 Built-in Middleware](#built-in-middleware)
+- [🛣️ Tower & Axum Middleware Architecture](#tower--axum-middleware-architecture)
+- [📦 Built-in Middleware Layers](#built-in-middleware-layers)
+- [🛠️ Writing Custom Middleware (`middleware::from_fn`)](#writing-custom-middleware-middlewarefrom_fn)
+- [📍 Applying Middleware in Routes](#applying-middleware-in-routes)
 
 ---
 
-## 🛠️ Writing Custom Middleware
+## 📦 Built-in Middleware Layers
 
-Creating custom middleware in Go is straightforward:
+Padi automatically configures essential production middleware on startup:
 
-```go
-package middleware
-
-import (
-	"net/http"
-	"github.com/wibiesana/padi_go_core/response"
-)
-
-func ApiKeyHeader(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		apiKey := r.Header.Get("X-API-KEY")
-		if apiKey != "expected-secret-key" {
-			response.Forbidden(w, "Invalid or missing API key")
-			return // Stops propagation
-		}
-
-		// Continue downstream
-		next.ServeHTTP(w, r)
-	})
-}
-```
-
----
-
-## 📍 Registering Middleware
-
-Middlewares are registered on `router.Router` or Chi route groups in `app/Routes/api.go`:
-
-### Global Middleware
-```go
-func RegisterRoutes(r *router.Router) {
-	// Applied to every request
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Cors())
-}
-```
-
-### Route Group Middleware
-```go
-// Protected admin endpoints
-r.Group(func(admin router.Route) {
-	admin.Use(middleware.Auth)
-	admin.Use(middleware.RequireRole("admin", "superadmin"))
-
-	admin.Get("/admin/dashboard", adminCtrl.Dashboard)
-})
-```
-
----
-
-## 📦 Built-in Middleware
-
-| Middleware | Description |
+| Layer / Mechanism | Description |
 | :--- | :--- |
-| `middleware.Auth` / `middleware.AuthRequired` | Validates Bearer JWT tokens and sets `UserClaims` in request context |
-| `middleware.RequireRole(roles...)` | Restricts access to users with specified roles (e.g. `"admin"`) |
-| `middleware.SecurityHeaders` | Injects standard security headers (`nosniff`, `DENY`, `X-XSS-Protection`) |
-| `middleware.CORS(cfg)` | Configures CORS headers based on `.env` `CORS_ALLOWED_ORIGINS` |
-| `middleware.RateLimit(limit, window)` | In-memory token-bucket rate limiter per client IP. IP extracted from `X-Forwarded-For` (sanitised) or `RemoteAddr`. Expired buckets cleaned up automatically every minute to prevent memory leaks. |
-| `middleware.Logger` | Structured HTTP request logger with latency, status code, and query telemetry. Stores request start time in context for accurate `execution_time` reporting. |
-| `middleware.Recoverer` | Recovers from runtime panics (including `database.GetDB()` initialisation failures) and returns a clean 500 JSON with debug stack trace in development mode. |
+| **CORS Layer** | Parses `CORS_ALLOWED_ORIGINS` from `.env` (or defaults to `*`), handling preflight `OPTIONS` requests automatically. |
+| **Panic Recovery Layer** | Intercepts unexpected thread panics, logs details, and formats them as clean 500 `ApiError` JSON responses instead of crashing the server. |
+| **Request Tracing & Logger** | Structured request tracing via `tracing-subscriber` and `tracing-appender`. Logs requests to stdout and writes daily rolling logs to `storage/logs/app.log` and `storage/logs/error.log`. |
+| **Response Compression** | Built-in Gzip/Deflate compression enabled when `ENABLE_COMPRESSION=true`. |
+| **`AuthUser` Extractor** | Type-safe extractor acting as authentication middleware on any handler that includes `auth: AuthUser`. |
 
 ---
 
-## ⚙️ Debug Mode Check
+## 🛠️ Writing Custom Middleware (`middleware::from_fn`)
 
-All middleware that adapts its behaviour in development (`Logger` showing query telemetry, `Recoverer` including stack traces) uses `config.IsDebug()` — a single authoritative check that returns `true` when:
-- `APP_DEBUG=true`, **or**
-- `APP_ENV` is `development`, `dev`, or `local`
+You can create custom middleware using Axum's `middleware::from_fn`:
 
-This means you never need to scatter `cfg.AppDebug || cfg.AppEnv == "development"` checks manually in your own middleware.
+```rust
+use axum::{
+    extract::Request,
+    middleware::Next,
+    response::Response,
+};
+use padi_core::error::ApiError;
 
+pub async fn require_api_key(
+    req: Request,
+    next: Next,
+) -> Result<Response, ApiError> {
+    if let Some(key) = req.headers().get("X-API-KEY") {
+        if key == "secret-api-key" {
+            return Ok(next.run(req).await);
+        }
+    }
+
+    Err(ApiError::forbidden("Invalid or missing API key"))
+}
+```
+
+---
+
+## 📍 Applying Middleware in Routes
+
+Register your middleware using `.layer()` on Axum routers:
+
+```rust
+use axum::{middleware, Router};
+
+pub fn admin_routes() -> Router {
+    Router::new()
+        .route("/metrics", get(metrics_handler))
+        .layer(middleware::from_fn(require_api_key))
+}
+```
+
+---
+
+## ⚙️ Debug vs Production Handling
+
+In development mode (`APP_ENV=development` or `APP_DEBUG=true`), `ApiError` includes internal error messages and detailed traces. In production (`APP_ENV=production`), sensitive internal details are hidden to prevent information disclosure.

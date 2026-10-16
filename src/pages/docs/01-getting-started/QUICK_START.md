@@ -2,7 +2,7 @@
 
 ## ⚡ Speed to Market: Zero to API in Seconds
 
-Experience the ultimate developer fast-track. **Padi REST API Framework for Go** is engineered for **Instant Productivity**, allowing you to go from a clean slate to a fully-functional, secure, and industrial-grade REST API in less than 60 seconds.
+Experience the ultimate developer fast-track. **Padi Rust Api Framework** is engineered for **Instant Productivity**, allowing you to go from a clean slate to a fully-functional, secure, and industrial-grade REST API in less than 60 seconds with Rust, Axum, Tokio, and SQLx.
 
 ---
 
@@ -20,19 +20,18 @@ Experience the ultimate developer fast-track. **Padi REST API Framework for Go**
 
 ## 📝 Prerequisites
 
-- **Go 1.22+**
-- **Database (Optional):** SQLite (built-in, no server required), MySQL/MariaDB, or PostgreSQL
+- **Rust 1.75+ (2021 Edition)** with Cargo
+- **Database (Optional):** SQLite (built-in via SQLx, file located at `database/app.db`), MySQL/MariaDB, or PostgreSQL
 
 ---
 
 ## 🤖 Quick Installation
 
-Clone or initialize a new project using the template:
+Clone the starter template:
 
 ```bash
-git clone https://github.com/wibiesana/padi_go.git my-app
+git clone https://github.com/wibiesana/padi_rust.git my-app
 cd my-app
-go mod tidy
 ```
 
 Copy the environment file:
@@ -44,56 +43,90 @@ cp .env.example .env
 Run database migrations:
 
 ```bash
-go run cmd/padi/main.go migrate
+# Windows:
+padi migrate
+# Linux / macOS:
+./padi migrate
+# Or with cargo:
+cargo run -- migrate
 ```
 
 Start the API server:
 
 ```bash
-go run cmd/padi/main.go serve
+# Windows:
+padi serve
+# Linux / macOS:
+./padi serve
+# Or with cargo:
+cargo run
 ```
 
-Visit: `http://localhost:8080`
+Visit: `http://127.0.0.1:8080`
 
 ---
 
 ## 🗄️ Database Support
 
-- ✅ **SQLite** (Native pure Go driver via `modernc.org/sqlite` - no CGO required)
-- ✅ **MySQL / MariaDB** (via `go-sql-driver/mysql`)
-- ✅ **PostgreSQL** (via `lib/pq`)
+- ✅ **SQLite** (Default - embedded via SQLx, zero setup required, file at `database/app.db`)
+- ✅ **MySQL / MariaDB** (via SQLx)
+- ✅ **PostgreSQL** (via SQLx)
+
+Configure via `DB_DRIVER` and `DB_DATABASE` or set `DATABASE_URL` directly in `.env`.
 
 ---
 
 ## 💻 Essential Commands
 
+Use `padi` (Windows: `padi.bat`, Linux/macOS: `./padi`, or `cargo run -- <command>`):
+
 ### 1. Database Migrations
 
 ```bash
 # Run pending migrations
-go run cmd/padi/main.go migrate
+padi migrate
 
 # Rollback last migration batch
-go run cmd/padi/main.go migrate:rollback
+padi migrate:rollback
+
+# Show migration status
+padi migrate:status
 ```
 
 ### 2. Scaffold Complete CRUD
 
 ```bash
-# Generate Base Model, Model, Controller, and API collection for a table
-go run cmd/padi/main.go generate:crud products
-# Or short alias:
-go run cmd/padi/main.go g products
+# Generate Model, Resource, Controller, and Route for a single table:
+padi g products
+# Or full command:
+padi generate:crud products
 
-# Generate CRUD for all tables in database:
-go run cmd/padi/main.go generate:crud-all
+# Generate CRUD for ALL tables in the database at once:
+padi ga
+# Or full command:
+padi generate:crud-all
 ```
 
-### 3. Start Background Queue Worker
+### 3. Make Individual Components
 
 ```bash
-# Process background jobs
-go run cmd/padi/main.go queue:work
+padi make:controller Product
+padi make:model products
+padi make:resource Product
+padi make:migration create_products_table
+```
+
+### 4. Background Queue Worker
+
+```bash
+# Process background jobs from the queue:
+padi queue:work
+
+# Process a single job:
+padi queue:work --once
+
+# Stop when queue is empty:
+padi queue:work --stop-when-empty
 ```
 
 ---
@@ -102,27 +135,37 @@ go run cmd/padi/main.go queue:work
 
 ```
 my-app/
-├── app/
-│   ├── Controllers/       # Concrete controllers (add custom actions here)
-│   │   └── Base/          # Auto-generated base controllers (overwritten on sync)
-│   ├── Models/            # Concrete models (custom methods & hooks)
-│   │   └── Base/          # Auto-generated model schemas (overwritten on sync)
-│   └── Routes/
-│       └── api.go         # Route registration
-├── cmd/
-│   └── padi/
-│       └── main.go        # Padi CLI tool
+├── Cargo.toml            # Rust dependencies & metadata
 ├── database/
-│   └── migrations/        # Database migration files
-├── storage/               # File uploads and cache storage
-├── .env                   # Environment configuration
-└── go.mod                 # Go module definition
+│   ├── app.db            # Default SQLite database
+│   └── migrations/       # SQL migration files (.sql)
+├── padi                  # CLI wrapper script for Linux / macOS
+├── padi.bat              # CLI wrapper script for Windows
+├── src/
+│   ├── controllers/      # Axum request handlers
+│   │   ├── auth.rs       # Login, register, me, refresh, logout
+│   │   ├── users.rs      # User management handlers
+│   │   └── mod.rs
+│   ├── models/           # ActiveRecord Models
+│   │   ├── user.rs       # USERS model definition
+│   │   └── mod.rs
+│   ├── resources/        # API Resources / serializers
+│   │   ├── user.rs       # UserResource transformation
+│   │   └── mod.rs
+│   ├── routes/           # Axum router registration
+│   │   ├── auth.rs       # /auth routes
+│   │   ├── site.rs       # Root / health routes
+│   │   ├── users.rs      # /users routes
+│   │   └── mod.rs        # Router entrypoint
+│   └── main.rs           # Application runner & CLI dispatcher
+├── storage/              # Logs, cache, and uploaded files
+└── .env                  # Environment configuration
 ```
 
 ---
 
 ## 👣 Next Steps
 
-1. Check the [ActiveRecord Guide](../02-core-concepts/ACTIVE_RECORD.md) to learn how to query and manipulate data.
-2. Check the [Response Structure Guide](../02-core-concepts/RESPONSE_STRUCTURE.md) for JSON payload standards (`items` vs `item`).
-3. Scaffold your first database table with `go run cmd/padi/main.go g <table_name>`.
+1. Check the [ActiveRecord Guide](../02-core-concepts/ACTIVE_RECORD.md) to learn how to query and manipulate data in Rust.
+2. Check the [Response Structure Guide](../02-core-concepts/RESPONSE_STRUCTURE.md) for JSON payload standards (`item` vs `items`).
+3. Scaffold your first database table with `padi g <table_name>`.

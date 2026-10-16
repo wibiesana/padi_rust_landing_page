@@ -1,5 +1,5 @@
 export const APP_CONFIG = {
-  version: '0.0.1',
-  name: 'PADI REST API GO',
+  version: '0.1.0',
+  name: 'Padi Rust Api Framework',
   cliName: 'padi',
 }

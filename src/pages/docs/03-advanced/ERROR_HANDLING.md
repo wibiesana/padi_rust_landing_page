@@ -2,7 +2,7 @@
 
 ## 🛡️ Resilient, Structured Error Handling
 
-In Padi Go Framework, errors and panics are handled gracefully using standardized HTTP status codes, structured JSON responses, and panic recovery middleware.
+In Padi Rust Framework, errors and thread panics are handled gracefully using `padi_core::error::ApiError`, structured JSON responses, and panic recovery middleware layers.
 
 ---
 
@@ -10,21 +10,22 @@ In Padi Go Framework, errors and panics are handled gracefully using standardize
 
 - [🛡️ Resilient, Structured Error Handling](#resilient-structured-error-handling)
 - [📦 Standard Error Format](#standard-error-format)
-- [🛠️ Error Response Helpers](#error-response-helpers)
-- [🚨 Panic Recovery Middleware](#panic-recovery-middleware)
+- [🛠️ The `ApiError` Type](#the-apierror-type)
+- [🚨 Panic Recovery](#panic-recovery)
 - [📝 Input Validation Errors](#input-validation-errors)
 
 ---
 
 ## 📦 Standard Error Format
 
-All error responses from Padi APIs conform to a predictable structure:
+All error responses from Padi APIs conform to a deterministic structure:
 
 ```json
 {
-  "status": 404,
-  "success": false,
-  "message": "Product not found"
+  "code": 404,
+  "status": "NOT_FOUND",
+  "message": "Product not found",
+  "execution_time": "1.05ms"
 }
 ```
 
@@ -32,80 +33,88 @@ Validation failures return structured field-level errors:
 
 ```json
 {
-  "status": 422,
-  "success": false,
-  "message": "Validation failed",
+  "code": 422,
+  "status": "VALIDATION_FAILED",
+  "message": "The given data was invalid.",
   "errors": {
-    "email": "The email field must be a valid email address",
-    "password": "Password must be at least 6 characters long"
-  }
+    "email": [
+      "The email field must be a valid email address.",
+      "The email has already been taken."
+    ],
+    "password": [
+      "The password must be at least 8 characters."
+    ]
+  },
+  "execution_time": "0.91ms"
 }
 ```
 
 ---
 
-## 🛠️ Error Response Helpers
+## 🛠️ The `ApiError` Type
 
-The `github.com/wibiesana/padi_go_core/response` package provides standard error functions:
+Handlers return `ApiResult` (which is `Result<ApiResponse, ApiError>`). Use standard constructors:
 
-```go
-import "github.com/wibiesana/padi_go_core/response"
+```rust
+use padi_core::prelude::*;
 
 // 400 Bad Request
-response.BadRequest(w, "Invalid ID parameter")
+return Err(ApiError::bad_request("Invalid ID parameter"));
 
 // 401 Unauthorized
-response.Unauthorized(w, "Authentication required")
+return Err(ApiError::unauthorized("Invalid token or credentials"));
 
 // 403 Forbidden
-response.Forbidden(w, "Insufficient permissions")
+return Err(ApiError::forbidden("Insufficient permissions"));
 
 // 404 Not Found
-response.NotFound(w, "Article not found")
+return Err(ApiError::not_found("Resource not found"));
 
-// 422 Unprocessable Entity (Validation Error)
-response.UnprocessableEntity(w, validationErrors, "Validation failed")
+// 422 Validation Error
+return Err(ApiError::unprocessable("The given data was invalid."));
 
 // 500 Internal Server Error
-response.InternalServerError(w, "Database connection failure")
+return Err(ApiError::internal("Failed to connect to database"));
+```
+
+Because `ApiError` implements `From<sqlx::Error>`, database errors can be propagated cleanly using the standard Rust `?` operator:
+```rust
+let record = PRODUCTS.find_or_fail(id).await?;
 ```
 
 ---
 
-## 🚨 Panic Recovery Middleware
+## 🚨 Panic Recovery
 
-The `middleware.Recoverer` middleware intercepts any runtime panics in HTTP goroutines, logs the stack trace, and prevents server crashes:
+The built-in Tower catch-panic layer intercepts unexpected thread panics across worker threads, logs the stack trace to `storage/logs/error.log`, and prevents the application process from terminating.
 
-```go
-r.Use(middleware.Recoverer)
-```
-
-When an unhandled panic occurs — including infrastructure panics such as a database initialisation failure from `database.GetDB()` — the client receives a clean 500 JSON response:
-
+The client receives a clean 500 JSON response:
 ```json
 {
-  "status": 500,
-  "success": false,
-  "message": "Internal server error"
+  "code": 500,
+  "status": "INTERNAL_SERVER_ERROR",
+  "message": "Internal server error",
+  "execution_time": "0.45ms"
 }
 ```
 
-In **development mode** (`config.IsDebug()` returns `true`), the response also includes a `debug.trace` array with filtered stack frames so you can pinpoint the exact cause.
+In development mode (`APP_ENV=development` or `APP_DEBUG=true`), internal error details are surfaced to assist debugging.
 
 ---
 
 ## 📝 Input Validation Errors
 
-Use `validator.BindJSON` to automatically parse and validate request bodies:
+`padi_core::validator::Validator` automatically formats validation failures into the standardized 422 JSON payload:
 
-```go
-func (c *UserController) Store(w http.ResponseWriter, r *http.Request) {
-	var item models.User
-	if errs, err := validator.BindJSON(r, &item); err != nil {
-		response.UnprocessableEntity(w, errs, "Validation failed")
-		return
-	}
-
-	// ...
-}
+```rust
+let d = Validator::new(
+    &body,
+    &[
+        ("name", "required|string|min:2|max:100"),
+        ("email", "required|email|unique:users,email"),
+        ("password", "required|string|min:8"),
+    ],
+)
+.validate()
+.await?;
 ```

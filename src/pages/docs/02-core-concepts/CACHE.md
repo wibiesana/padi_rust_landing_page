@@ -1,23 +1,26 @@
 # ⚡ Cache Engine Guide
 
-The Padi Cache package (`github.com/wibiesana/padi_go_core/cache`) provides thread-safe, multi-tier caching with a **L1 (memory) + L2 (Redis | File)** architecture — equivalent to the PHP `Cache` class.
+The Padi Cache module (`padi_core::cache::Cache`) provides high-performance, two-tier caching with **L1 (In-Memory)** and **L2 (File Storage)** architectures.
 
 ---
 
 ## ⚙️ Configuration (.env)
 
 ```env
-# Cache driver: memory | file | redis
+# Cache driver: file | memory
 CACHE_DRIVER=file
 
-# Max L1 in-memory entries before eviction (oldest 25% removed)
+# Default cache TTL in seconds
+CACHE_TTL=300
+
+# Cache directory (default: storage/cache)
+CACHE_DIR=storage/cache
+
+# Max L1 in-memory entries before LRU eviction
 CACHE_L1_MAX=1000
 
-# Redis (only when CACHE_DRIVER=redis)
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_DB=0
+# Max L1 memory allocation in MB (0 = disabled)
+CACHE_L1_MAX_MEMORY_MB=64
 ```
 
 ---
@@ -25,105 +28,68 @@ REDIS_DB=0
 ## 🛠️ Usage Examples
 
 ### 1. Set & Get
+```rust
+use padi_core::prelude::*;
 
-```go
-import (
-    "time"
-    "github.com/wibiesana/padi_go_core/cache"
-)
-
-// Store item for 10 minutes
-cache.Set("trending_articles", articles, 10*time.Minute)
+// Store item with TTL (None = default CACHE_TTL, Some(600) = 10 minutes, Some(0) = forever)
+Cache::set("trending_products", &json!([{"id": 1, "name": "Keyboard"}]), Some(600));
 
 // Retrieve item
-var cachedArticles []Article
-if cache.Get("trending_articles", &cachedArticles) {
-    // Cache hit — use cachedArticles
+if let Some(data) = Cache::get("trending_products") {
+    println!("Cache hit: {:?}", data);
+}
+
+// Retrieve or fallback
+let val = Cache::get_or("site_name", json!("Padi Framework"));
+```
+
+### 2. Has — Check Existence
+```rust
+if Cache::has("user:42:profile") {
+    // Key exists and is valid
 }
 ```
 
-### 2. Has — Check Existence Without Fetching
+### 3. Remember (Cache-Aside Pattern)
+Checks if the key exists. On cache miss, it executes the async closure, stores the result in cache, and returns it:
 
-```go
-if cache.Has("user:42:profile") {
-    // Key exists and is not expired
-}
+```rust
+let stats = Cache::remember("dashboard_stats", Some(900), || async {
+    // Expensive calculation or database query
+    let total_users = USERS.count().await.unwrap_or(0);
+    json!({ "total_users": total_users })
+}).await;
 ```
 
-### 3. RememberTyped (Type-Safe Generic Cache-Aside Pattern)
+### 4. Atomic Counters (Increment & Decrement)
+```rust
+// Increment by 1
+let count = Cache::increment("page_views", 1);
 
-`cache.RememberTyped[T]` checks if the key exists. On miss, it calls the closure, caches the result, and returns it directly as type `T`:
-
-```go
-stats, err := cache.RememberTyped[DashboardStats]("dashboard_stats", 15*time.Minute, func() (DashboardStats, error) {
-    // Expensive query — executed only on cache miss
-    return computeHeavyStats()
-})
-
-// Or with GetTyped[T]:
-cachedStats, hit, err := cache.GetTyped[DashboardStats]("dashboard_stats")
-if hit {
-    // Use cachedStats directly
-}
+// Decrement by 5
+let remaining = Cache::decrement("rate_limit_quota", 5);
 ```
 
-### 4. Increment & Decrement (Atomic Counters)
+### 5. Invalidation & Deletion
+```rust
+// Delete single key
+Cache::delete("trending_products");
+// Or alias:
+Cache::forget("trending_products");
 
-```go
-// Atomic increment (works with memory, file, and Redis drivers)
-newCount, _ := cache.Increment("page_views:home")
+// Delete multiple keys
+Cache::delete_many(&["key1", "key2", "key3"]);
 
-// Increment by a custom step
-cache.Increment("api_calls", 5)
-
-// Decrement
-cache.Decrement("remaining_quota")
-```
-
-### 5. Delete Single / Multiple Keys
-
-```go
-// Single
-cache.Delete("trending_articles")
-
-// Multiple at once (single Redis DEL command when using redis driver)
-cache.DeleteMany([]string{"key1", "key2", "key3"})
-```
-
-### 6. Flush All & Cleanup Expired
-
-```go
-// Flush all cached items (L1 + L2)
-cache.Flush()
-
-// Remove expired file cache entries (file driver only)
-// Redis handles TTL natively, no cleanup needed
-deleted := cache.Cleanup()
+// Flush entire cache
+Cache::clear();
+// Or alias:
+Cache::flush();
 ```
 
 ---
 
-## 📦 Cache API Reference
+## 📁 Storage Architecture
 
-| Function | Description |
-| :--- | :--- |
-| `cache.Set(key, val, ttl)` | Store value with TTL (`0` = forever) |
-| `cache.Get(key, &target)` | Retrieve value — returns `bool` (hit/miss) |
-| `cache.Has(key)` | Check if key exists without fetching |
-| `cache.Remember(key, ttl, &target, fn)` | Get-or-compute-and-store pattern |
-| `cache.Increment(key, step...)` | Atomically increment numeric value |
-| `cache.Decrement(key, step...)` | Atomically decrement numeric value |
-| `cache.Delete(key)` | Remove single key |
-| `cache.DeleteMany(keys)` | Remove multiple keys at once |
-| `cache.Flush()` | Clear all entries |
-| `cache.Cleanup()` | Purge expired file cache entries |
-| `cache.GetMemorySize()` | L1 entry count (monitoring) |
-
----
-
-## 🔒 Thread Safety & Reliability
-
-- **L1 Memory**: Guarded by `sync.RWMutex` — concurrent-safe for high-throughput APIs.
-- **L2 File**: Uses **atomic writes** (`temp file → rename`) to prevent partial reads under concurrent access.
-- **L2 Redis**: Uses `go-redis/v9` with native atomic `INCRBY` and `DEL` commands.
-- **Eviction**: When L1 exceeds `CACHE_L1_MAX`, the oldest 25% of entries are evicted automatically.
+- **L1 In-Memory:** Thread-safe `RwLock<HashMap>` for sub-microsecond cache hits.
+- **L2 File Storage:** Atomic writes (temporary write + rename), keys are hashed with SHA-256 and bucketed across 256 subdirectories (`storage/cache/xx/<hash>.cache`).
+- **Expired Entry Sweeping:** Call `Cache::cleanup()` to clean expired file entries on disk.

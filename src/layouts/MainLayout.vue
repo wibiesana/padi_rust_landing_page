@@ -17,7 +17,7 @@
             <q-img :src="logoIcon" width="34px" height="34px" fit="contain" />
           </div>
           <div class="column justify-center">
-            <span class="text-weight-bolder text-white brand-title">PADI REST API GO</span>
+            <span class="text-weight-bolder text-white brand-title">Padi Rust Api Framework</span>
           </div>
           <q-badge
             color="primary"
@@ -46,7 +46,7 @@
             color="primary"
             label="GitHub"
             icon="code"
-            href="https://github.com/wibiesana/padi_go"
+            href="https://github.com/wibiesana/padi_rust"
             target="_blank"
             class="github-btn text-weight-bold"
           />
@@ -98,7 +98,7 @@
           <q-item-section>{{ $t('nav.fullDocumentation') }}</q-item-section>
         </q-item>
         <q-separator dark q-my-sm />
-        <q-item clickable tag="a" href="https://github.com/wibiesana/padi_rest_api" target="_blank">
+        <q-item clickable tag="a" href="https://github.com/wibiesana/padi_rust" target="_blank">
           <q-item-section avatar><q-icon name="code" color="primary" /></q-item-section>
           <q-item-section>{{ $t('nav.githubRepo') }}</q-item-section>
         </q-item>
@@ -120,7 +120,7 @@
     </q-page-container>
 
     <q-footer class="bg-dark text-white q-pa-lg text-center border-top">
-      <div class="text-subtitle1">&copy; 2026 PADI REST API GO Framework</div>
+      <div class="text-subtitle1">&copy; 2026 Padi Rust Api Framework</div>
       <div class="text-caption text-grey-5">{{ $t('nav.builtWith') }}</div>
     </q-footer>
   </q-layout>
@@ -211,7 +211,7 @@ function scrollTo(id) {
   transition: all 0.2s ease;
 
   &:hover {
-    color: #00ADD8;
+    color: #e05d44;
     background-color: #1f2937;
   }
 }
@@ -222,7 +222,7 @@ function scrollTo(id) {
   font-size: 0.95rem;
   transition: all 0.2s ease;
   &:hover {
-    background-color: #008bb0;
+    background-color: #c74d36;
   }
 }
 
@@ -232,7 +232,7 @@ function scrollTo(id) {
   font-size: 0.95rem;
   transition: all 0.2s ease;
   &:hover {
-    background-color: rgba(0, 173, 216, 0.1);
+    background-color: rgba(224, 93, 68, 0.1);
   }
 }
 
@@ -242,8 +242,8 @@ function scrollTo(id) {
   padding: 6px 14px;
   border-color: #374151 !important;
   &:hover {
-    border-color: #00ADD8 !important;
-    color: #00ADD8 !important;
+    border-color: #e05d44 !important;
+    color: #e05d44 !important;
   }
 }
 
@@ -284,11 +284,11 @@ function scrollTo(id) {
   .q-item--active,
   .q-item.q-item--active,
   .q-manual-focusable--focused {
-    background-color: rgba(0, 173, 216, 0.15) !important;
-    color: #00ADD8 !important;
+    background-color: rgba(224, 93, 68, 0.15) !important;
+    color: #e05d44 !important;
 
     .lang-text {
-      color: #00ADD8 !important;
+      color: #e05d44 !important;
       font-weight: 700 !important;
     }
   }

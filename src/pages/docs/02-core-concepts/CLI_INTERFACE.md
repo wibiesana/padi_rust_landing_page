@@ -1,78 +1,96 @@
 # 💻 CLI Interface Guide
 
-Padi Framework includes a powerful CLI utility (`cmd/padi/main.go`) built with Cobra.
+Padi Rust Framework includes a built-in CLI console engine (`padi_core::console::Console`). It can be invoked via the root wrapper scripts:
+- **Windows:** `padi <command>` (via `padi.bat`)
+- **Linux / macOS:** `./padi <command>`
+- **Cargo:** `cargo run -- <command>`
 
 ---
 
 ## 📋 Available Commands
 
-### 1. Interactive Setup Wizard
+### 1. Interactive Setup Wizard (`padi init` or `padi setup`)
 ```bash
-go run cmd/padi/main.go init
+padi init
 ```
-Interactively configures your database (SQLite, MySQL, or PostgreSQL), tests credentials, generates secure 64-character JWT secrets, writes `.env`, and executes migrations automatically.
+Interactively configures your database (SQLite, MySQL, or PostgreSQL), tests credentials, generates a cryptographically secure 32-character `JWT_SECRET`, writes `.env`, runs migrations, and prompts to scaffold CRUD automatically.
 
-### 2. Start Server
+### 2. Start HTTP Server (`padi serve`)
 ```bash
-go run cmd/padi/main.go serve
+padi serve
+# Or via Cargo:
+cargo run
+
+# With host or port overrides:
+padi serve --port=3000 --host=127.0.0.1
 ```
-Starts the API server at `http://localhost:<APP_PORT>`.
+Starts the Axum REST API server at `http://<APP_HOST>:<APP_PORT>`.
 
-### 2. Database Migrations
+### 3. Database Migrations (`padi migrate`)
 ```bash
-# Run all pending migrations
-go run cmd/padi/main.go migrate
+# Run all pending migrations:
+padi migrate
 
-# Rollback latest migration batch
-go run cmd/padi/main.go migrate:rollback
-```
+# Run migrations for specific tables only:
+padi migrate --tables=users,products
 
-### 3. Generate CRUD
-```bash
-# Scaffold single database table
-go run cmd/padi/main.go generate:crud <table_name>
-# Short alias:
-go run cmd/padi/main.go g <table_name>
+# Rollback last migration batch:
+padi migrate:rollback
+# Rollback multiple steps:
+padi migrate:rollback --step=2
 
-# Scaffold with Real-time SSE broadcasting enabled automatically:
-go run cmd/padi/main.go generate:crud <table_name> --realtime
-# Or with short flag:
-go run cmd/padi/main.go g <table_name> -r
-
-# Scaffold all database tables at once:
-go run cmd/padi/main.go generate:crud-all
-# Short alias:
-go run cmd/padi/main.go ga
-
-# Scaffold all database tables with Real-time SSE enabled:
-go run cmd/padi/main.go ga -r
+# Check migration status:
+padi migrate:status
 ```
 
-
-### 4. Background Queue Worker
+### 4. Code Generation (CRUD Scaffolding)
 ```bash
-# Start queue processor listening on default queue
-go run cmd/padi/main.go queue:work
+# Scaffold single database table (Model, Resource, Controller, Route):
+padi g <table_name>
+# Or full command:
+padi generate:crud <table_name>
 
-# Listen on a specific queue
-go run cmd/padi/main.go queue:work emails
+# Scaffold ALL database tables in one go:
+padi ga
+# Or full command:
+padi generate:crud-all
+
+# Force overwrite existing generated files:
+padi g <table_name> --force
 ```
 
-### 5. Make Generators
+### 5. Make Individual Components
 ```bash
-# Create a new model
-go run cmd/padi/main.go make:model Product
+# Create a new controller template in src/controllers/
+padi make:controller Product
 
-# Create a new controller
-go run cmd/padi/main.go make:controller ProductController
+# Create a new model from database table schema:
+padi make:model products
 
-# Create a timestamped migration file
-go run cmd/padi/main.go make:migration create_products_table
+# Create an API resource serializer in src/resources/
+padi make:resource Product
+
+# Create a timestamped SQL migration file in database/migrations/
+padi make:migration create_products_table
 ```
 
-### 6. Build Production Binary
+### 6. Background Queue Worker (`padi queue:work`)
 ```bash
-go run cmd/padi/main.go build
-```
-Compiles a stripped, production-ready binary (`-ldflags "-s -w"`) named automatically after `APP_NAME` in your `.env` file (e.g. `padi-rest-api-go.exe` on Windows or `padi-rest-api-go` on Linux).
+# Start background worker loop on default queue:
+padi queue:work
 
+# Listen to a specific queue:
+padi queue:work emails
+
+# Process a single job and exit:
+padi queue:work --once
+
+# Stop automatically when all pending jobs have been executed:
+padi queue:work --stop-when-empty
+```
+
+### 7. Compile Release Binary
+```bash
+cargo build --release
+```
+Produces an optimized binary at `./target/release/padi_rust`.

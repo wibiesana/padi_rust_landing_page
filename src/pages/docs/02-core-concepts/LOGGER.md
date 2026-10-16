@@ -1,74 +1,62 @@
 # 📋 Logger Guide
 
-The Padi Logger package (`github.com/wibiesana/padi_go_core/logger`) provides **daily rotating file logs**
+The Padi Logger module (`padi_core::logger::Logger`) provides high-performance, non-blocking, structured logging powered by `tracing-subscriber` and `tracing-appender`.
 
-Logs are written to **two destinations simultaneously**:
+Logs are written simultaneously to:
+1. **stdout** (formatted with ANSI color coding for terminal debugging and container environments).
+2. **Rolling file `storage/logs/app.log`** (captures all `INFO`, `WARN`, `ERROR` events).
+3. **Dedicated error file `storage/logs/error.log`** (captures only `ERROR` level events).
 
-1. **stdout** — for container and cloud environments
-2. **Daily rotating files** — `storage/logs/app-YYYY-MM-DD.log`
-
-`ERROR` and `CRITICAL` entries are additionally written to `storage/logs/error-YYYY-MM-DD.log`.  
-Log files older than **14 days are automatically deleted**.
+Logs older than 14 days are cleaned up automatically on startup.
 
 ---
 
 ## 🛠️ Usage
 
-```go
-import "github.com/wibiesana/padi_go_core/logger"
+```rust
+use padi_core::prelude::*;
 
-logger.Info("Server started on port 8080")
+// Standard logging:
+Logger::info("Application started on port 8080");
 
-logger.Warning("Deprecated endpoint called", map[string]interface{}{
-    "path":   "/api/v1/old-endpoint",
-    "caller": r.RemoteAddr,
-})
+// Logging with JSON context metadata:
+Logger::info_with("User logged in", &json!({
+    "user_id": 42,
+    "ip": "127.0.0.1"
+}));
 
-logger.Error("Database query failed", map[string]interface{}{
-    "error": err.Error(),
-    "query": "SELECT * FROM users WHERE id = ?",
-})
+// Warning:
+Logger::warn("Rate limit threshold approached");
 
-logger.Debug("Cache miss", map[string]interface{}{
-    "key": "trending_articles",
-})
-
-logger.Critical("Payment gateway unreachable", map[string]interface{}{
+// Error logging:
+Logger::error_with("Payment gateway failure", &json!({
     "gateway": "stripe",
     "attempt": 3,
-})
+    "error": "connection timeout"
+}));
 ```
 
 ---
 
-## 📁 Log File Structure
+## 📁 Storage Directory Structure
 
 ```
 storage/
 └── logs/
-    ├── app-2026-08-31.log      # All log levels
-    ├── app-2026-09-01.log
-    ├── error-2026-08-31.log    # ERROR + CRITICAL only
-    └── error-2026-09-01.log
-```
-
-**Log format:**
-
-```
-[2026-08-31 20:55:13] INFO: Server started on port 8080
-[2026-08-31 21:00:44] ERROR: Database query failed {"error":"connection refused","query":"SELECT * FROM users WHERE id = ?"}
+    ├── app.log.2026-10-16       # All events
+    └── error.log.2026-10-16     # ERROR events only
 ```
 
 ---
 
 ## 📦 Logger API Reference
 
-| Function                     |   Level    | Description                                   |
-| :--------------------------- | :--------: | :-------------------------------------------- |
-| `logger.Info(msg, ctx?)`     |   `INFO`   | General informational messages                |
-| `logger.Warning(msg, ctx?)`  | `WARNING`  | Non-fatal warnings                            |
-| `logger.Error(msg, ctx?)`    |  `ERROR`   | Errors requiring attention                    |
-| `logger.Debug(msg, ctx?)`    |  `DEBUG`   | Developer debug information                   |
-| `logger.Critical(msg, ctx?)` | `CRITICAL` | Critical failures (also written to error log) |
-
-The optional `ctx` parameter is a `map[string]interface{}` serialized as JSON in the log line.
+| Function | Level | Description |
+| :--- | :---: | :--- |
+| `Logger::info(msg)` | `INFO` | General operational message |
+| `Logger::info_with(msg, &ctx)` | `INFO` | Operational message with structured JSON context |
+| `Logger::warn(msg)` | `WARN` | Warning event |
+| `Logger::warn_with(msg, &ctx)` | `WARN` | Warning with structured JSON context |
+| `Logger::error(msg)` | `ERROR` | Error requiring attention (written to `error.log`) |
+| `Logger::error_with(msg, &ctx)` | `ERROR` | Error with structured JSON context |
+| `Logger::debug(msg)` | `DEBUG` | Detailed diagnostic information |

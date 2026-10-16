@@ -2,7 +2,7 @@
 
 ## 📊 Industrial-Grade Data Streaming & Pagination
 
-Padi REST API Go Framework provides a high-performance pagination engine built into both **ActiveRecord** (`activerecord.Paginate[T]`) and the **Query Builder** (`query.Paginate`).
+Padi Rust Framework provides a high-performance pagination engine built into both **ActiveRecord** (`PRODUCTS.paginate(page, per_page)`) and the **Query Builder** (`Query::table(...).paginate(...)`).
 
 ---
 
@@ -10,10 +10,9 @@ Padi REST API Go Framework provides a high-performance pagination engine built i
 
 - [📊 Industrial-Grade Data Streaming & Pagination](#industrial-grade-data-streaming--pagination)
 - [📦 Response Structure](#response-structure)
-- [🛠️ ActiveRecord Pagination](#activerecord-pagination)
+- [🛠️ ActiveRecord Pagination in Handlers](#activerecord-pagination-in-handlers)
 - [🔍 Query Parameters](#query-parameters)
 - [📑 Query Builder Pagination](#query-builder-pagination)
-- [⭐ Best Practices](#best-practices)
 
 ---
 
@@ -23,68 +22,50 @@ All paginated responses in Padi follow a deterministic format:
 
 ```json
 {
-  "status": 200,
-  "success": true,
-  "message": "Product list retrieved successfully",
+  "code": 200,
+  "status": "OK",
+  "message": "Success",
   "items": [
     {
       "id": 1,
       "name": "Mechanical Keyboard",
-      "price": 1200000,
-      "category": "Electronics"
+      "price": 89.99
     },
     {
       "id": 2,
       "name": "Wireless Mouse",
-      "price": 450000,
-      "category": "Electronics"
+      "price": 49.99
     }
   ],
   "meta": {
-    "total": 50,
+    "page": 1,
     "per_page": 15,
-    "current_page": 1,
-    "last_page": 4,
-    "from": 1,
-    "to": 15
-  }
+    "total": 50,
+    "page_count": 4
+  },
+  "execution_time": "1.85ms"
 }
 ```
 
 ---
 
-## 🛠️ ActiveRecord Pagination
+## 🛠️ ActiveRecord Pagination in Handlers
 
-Inside your controller, extract query parameters using `query.ParseOptions(r)` and call `activerecord.Paginate`:
+Use the `p: Params` extractor in your controller handler to parse `page` and `per_page` query strings:
 
-```go
-package controllers
+```rust
+use padi_core::prelude::*;
+use crate::{models::PRODUCTS, resources::ProductResource};
 
-import (
-	"net/http"
+pub async fn index(_auth: AuthUser, p: Params) -> ApiResult {
+    // Extracts ?page=1&per_page=15 (defaults: page 1, per_page 15)
+    let (page, per_page) = p.pagination();
 
-	models "padi-template/app/Models"
-	resources "padi-template/app/Resources"
-	"github.com/wibiesana/padi_go_core/activerecord"
-	"github.com/wibiesana/padi_go_core/query"
-	"github.com/wibiesana/padi_go_core/response"
-)
+    // Fetch paginated envelope from ActiveRecord
+    let paginated = PRODUCTS.paginate(page, per_page).await?;
 
-func (c *ProductController) Index(w http.ResponseWriter, r *http.Request) {
-	// Parse page, per_page, search, sort, order from URL query string
-	opts := query.ParseOptions(r)
-
-	// Searchable database columns
-	searchColumns := []string{"name", "description", "category"}
-
-	meta, records, err := activerecord.Paginate[models.Product](opts, searchColumns...)
-	if err != nil {
-		response.InternalServerError(w, "Failed to retrieve products")
-		return
-	}
-
-	res := resources.NewProductResource()
-	response.Paginated(w, res.ToMapCollection(records), meta, "Product list retrieved successfully")
+    // Transform collection via ProductResource
+    ok(ProductResource::wraps(&paginated))
 }
 ```
 
@@ -94,39 +75,31 @@ func (c *ProductController) Index(w http.ResponseWriter, r *http.Request) {
 
 | Parameter | Type | Default | Example | Description |
 | :--- | :---: | :---: | :--- | :--- |
-| `page` | `int` | `1` | `?page=2` | Current page number |
-| `per_page` | `int` | `15` | `?per_page=25` | Number of items per page (Max: 100) |
-| `search` | `string` | `""` | `?search=Keyboard` | Substring search across designated columns |
+| `page` | `i64` | `1` | `?page=2` | Current page number |
+| `per_page` | `i64` | `15` | `?per_page=25` | Number of items per page |
 | `sort` | `string` | `"id"` | `?sort=price` | Column to sort by |
-| `order` | `string` | `"DESC"` | `?order=ASC` | Sort direction (`ASC` or `DESC`) |
+| `order` | `string` | `"asc"` | `?order=desc` | Direction (`asc` or `desc`) |
 
 ---
 
 ## 📑 Query Builder Pagination
 
-When building custom complex queries with joins and conditional filters:
+When building complex queries with joins and filters, call `.paginate(page, per_page)` directly on `Query`:
 
-```go
-var products []models.Product
+```rust
+use padi_core::prelude::*;
 
-meta, err := query.New("products").
-	Where("status", "active").
-	Where("price", ">=", 100000).
-	OrderBy("created_at", "DESC").
-	Paginate(1, 20, &products)
+pub async fn search_products(p: Params) -> ApiResult {
+    let (page, per) = p.pagination();
+    let category = p.get("category").unwrap_or("Electronics");
 
-if err != nil {
-	response.InternalServerError(w, "Query error")
-	return
+    let paged_data = Query::table("products")
+        .where_eq("category", category)
+        .where_gt("stock", 0)
+        .order_by("price", "ASC")
+        .paginate(page, per)
+        .await?;
+
+    ok(paged_data)
 }
-
-response.Paginated(w, products, meta, "Filtered products retrieved")
 ```
-
----
-
-## ⭐ Best Practices
-
-1. **Index Search Columns**: Ensure all columns passed to `searchColumns...` have database indexes.
-2. **Cap `per_page`**: Limit `per_page` to prevent clients from requesting millions of rows in a single query.
-3. **Use Resources**: Pass the paginated records through `res.ToMapCollection(records)` to ensure consistent transformations.

@@ -148,7 +148,7 @@ const selectedMdHtml = ref('')
 useMeta(() => ({
   title: selectedMdTitle.value
     ? `Padi Docs - ${selectedMdTitle.value}`
-    : 'PADI REST API GO Documentation',
+    : 'Padi Rust Api Framework Documentation',
 }))
 
 const mdModules = import.meta.glob('./docs/**/*.md', { query: '?raw', import: 'default' })
@@ -937,7 +937,7 @@ onMounted(() => {
     -webkit-background-clip: unset !important;
     background-clip: unset !important;
     -webkit-text-fill-color: initial !important;
-    color: #00ADD8 !important;
+    color: #e05d44 !important;
   }
 
   @media (max-width: 599px) {

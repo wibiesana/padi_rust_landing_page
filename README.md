@@ -1,6 +1,6 @@
-# PADI REST API GO Landing Page
+# Padi Rust Api Framework Landing Page
 
-The official landing page for the [PADI REST API GO Framework](https://github.com/wibiesana/padi-rest-api-go). Built with Quasar Framework (Vue 3).
+The official landing page for the [Padi Rust Api Framework](https://github.com/wibiesana/padi_rust). Built with Quasar Framework (Vue 3).
 
 ## Install the dependencies
 

@@ -1,35 +1,35 @@
 # 🗄️ Database Orchestration & Transactions
 
-## 🏗️ Industrial-Grade Persistence & Atomic Integrity
+## 🏗️ Multi-Database Persistence & Atomic Integrity
 
-The Padi Database Layer (`github.com/wibiesana/padi_go_core/database`) provides a unified, thread-safe connection pooling system and atomic transaction management across **SQLite**, **PostgreSQL**, and **MySQL/MariaDB**.
+The Padi Database Layer (`padi_core::database::Database`) provides a unified, thread-safe connection pooling system built on **SQLx** supporting **SQLite**, **PostgreSQL**, and **MySQL/MariaDB**.
 
 ---
 
 ## 📋 Table of Contents
 
-- [🏗️ Industrial-Grade Persistence & Atomic Integrity](#industrial-grade-persistence--atomic-integrity)
+- [🏗️ Multi-Database Persistence & Atomic Integrity](#multi-database-persistence--atomic-integrity)
 - [⚙️ Database Configuration](#database-configuration)
 - [🛡️ Transaction Management](#transaction-management)
-  - [⚡ Automatic Transactions (`database.Transaction`)](#automatic-transactions-databasetransaction)
-  - [🛠️ Manual Transactions (`Begin`, `Commit`, `Rollback`)](#manual-transactions-begin-commit-rollback)
+- [🔍 Direct SQL Queries](#direct-sql-queries)
 - [🏊 Connection Pool Optimization](#connection-pool-optimization)
-- [🔍 Supported Drivers](#supported-drivers)
-- [✨ Architectural Benefits](#architectural-benefits)
+- [✨ Supported Drivers](#supported-drivers)
 
 ---
 
 ## ⚙️ Database Configuration
 
-Database credentials are read from `.env` and initialized via `database.InitDB`:
+Configure your database connection via `.env`:
 
 ```env
-# 1. SQLite (Pure Go driver - no CGO required)
-DB_CONNECTION=sqlite
-DB_DATABASE=database/database.sqlite
+# 1. SQLite (Default embedded database - zero configuration required)
+DB_DRIVER=sqlite
+DB_DATABASE=database/app.db
 
 # 2. PostgreSQL
-# DB_CONNECTION=postgres
+# DB_DRIVER=pgsql
+# DATABASE_URL=postgres://user:password@127.0.0.1:5432/padi_db
+# Or individual fields:
 # DB_HOST=127.0.0.1
 # DB_PORT=5432
 # DB_DATABASE=padi_db
@@ -37,115 +37,92 @@ DB_DATABASE=database/database.sqlite
 # DB_PASSWORD=secret
 
 # 3. MySQL / MariaDB
-# DB_CONNECTION=mysql
-# DB_HOST=127.0.0.1
-# DB_PORT=3306
-# DB_DATABASE=padi_db
-# DB_USERNAME=root
-# DB_PASSWORD=secret
+# DB_DRIVER=mysql
+# DATABASE_URL=mysql://root:secret@127.0.0.1:3306/padi_db
+```
+
+The database pool is initialized at application startup:
+```rust
+Database::connect().await?;
 ```
 
 ---
 
 ## 🛡️ Transaction Management
 
-Ensure **Absolute Atomicity** for your critical financial and multi-step operations.
+Ensure atomic execution for multi-step database operations using `Database::transaction`:
 
-### ⚡ Automatic Transactions (`database.Transaction`)
-The recommended approach. Automatically commits if the closure returns `nil`, and automatically rolls back if an error occurs or a panic is caught:
+```rust
+use padi_core::prelude::*;
 
-```go
-import (
-	"database/sql"
-	"github.com/wibiesana/padi_go_core/database"
-)
+let result = Database::transaction(|tx| Box::pin(async move {
+    // Step 1: Create Order
+    let order_id = Database::execute_tx(
+        tx,
+        "INSERT INTO orders (total, user_id) VALUES (?, ?)",
+        &[Val::from(150.00), Val::from(user_id)]
+    ).await?;
 
-err := database.Transaction(func(tx *sql.Tx) error {
-	// Step 1: Create Order
-	res, err := tx.Exec("INSERT INTO orders (total, user_id) VALUES (?, ?)", 150000, userID)
-	if err != nil {
-		return err // Automatically rolls back
-	}
-	orderID, _ := res.LastInsertId()
+    // Step 2: Deduct Stock
+    Database::execute_tx(
+        tx,
+        "UPDATE products SET stock = stock - 1 WHERE id = ?",
+        &[Val::from(product_id)]
+    ).await?;
 
-	// Step 2: Deduct Stock
-	_, err = tx.Exec("UPDATE products SET stock = stock - 1 WHERE id = ?", productID)
-	if err != nil {
-		return err // Automatically rolls back
-	}
-
-	// Step 3: Insert Order Item
-	_, err = tx.Exec("INSERT INTO order_items (order_id, product_id) VALUES (?, ?)", orderID, productID)
-	return err
-})
-
-if err != nil {
-	log.Printf("Transaction failed and rolled back: %v", err)
-}
+    Ok(order_id)
+})).await?;
 ```
+
+If an error is returned inside the transaction closure, the entire transaction is rolled back automatically.
 
 ---
 
-### 🛠️ Manual Transactions (`Begin`, `Commit`, `Rollback`)
+## 🔍 Direct SQL Queries
 
-Use for surgical control over the transaction lifecycle:
+When raw SQL is needed, use `Database::fetch_all`, `Database::fetch_one`, or `Database::execute`:
 
-```go
-tx, err := database.Begin()
-if err != nil {
-	return err
-}
-defer tx.Rollback() // Safe no-op if Commit() succeeds
+```rust
+use padi_core::prelude::*;
 
-// Execute queries on tx
-_, err = tx.Exec("UPDATE wallets SET balance = balance - ? WHERE user_id = ?", amount, senderID)
-if err != nil {
-	return err
-}
+// Fetch multiple rows:
+let rows: Vec<Value> = Database::fetch_all(
+    "SELECT id, name, email FROM users WHERE role = ?",
+    &[Val::from("admin")]
+).await?;
 
-_, err = tx.Exec("UPDATE wallets SET balance = balance + ? WHERE user_id = ?", amount, receiverID)
-if err != nil {
-	return err
-}
+// Fetch a single row:
+let row: Option<Value> = Database::fetch_one(
+    "SELECT * FROM users WHERE id = ?",
+    &[Val::from(1)]
+).await?;
 
-// Explicit Commit
-return tx.Commit()
+// Execute mutation (INSERT, UPDATE, DELETE):
+let affected_rows = Database::execute(
+    "UPDATE users SET status = ? WHERE id = ?",
+    &[Val::from("active"), Val::from(1)]
+).await?;
 ```
+
+All parameters are bound using `Val::from(...)` to guarantee SQL injection safety.
 
 ---
 
 ## 🏊 Connection Pool Optimization
 
-Padi automatically configures healthy production defaults for `sql.DB`:
-
-```go
-db := database.GetDB()
-
-// Max idle connections retained in pool
-db.SetMaxIdleConns(25)
-
-// Max open connections to database server
-db.SetMaxOpenConns(100)
-
-// Maximum amount of time a connection may be reused
-db.SetConnMaxLifetime(15 * time.Minute)
+The connection pool size can be configured in `.env`:
+```env
+DB_MAX_CONNECTIONS=20
 ```
 
+SQLx maintains a thread-safe asynchronous pool shared across all Tokio worker threads.
+
 ---
 
-## 🔍 Supported Drivers
+## ✨ Supported Drivers
 
-| Driver | Go Package | Notes |
+| Driver | Identification | Notes |
 | :--- | :--- | :--- |
-| **SQLite** | `modernc.org/sqlite` | Pure Go, 100% CGO-free, cross-compilation friendly |
-| **PostgreSQL** | `github.com/lib/pq` | Enterprise analytical indexing, JSONB support |
-| **MySQL / MariaDB** | `github.com/go-sql-driver/mysql` | High-throughput web workloads, connection pooling |
-
----
-
-## ✨ Architectural Benefits
-
-1. **Zero-CGO SQLite**: Compile anywhere (Windows, macOS, Linux Alpine) with `CGO_ENABLED=0` without installing GCC.
-2. **Safe Generics**: Query Builder and ActiveRecord seamlessly integrate with `*sql.DB` and `*sql.Tx`.
-3. **Panic Safety**: Automatic transaction rollback prevents dangling database locks upon runtime panics.
-4. **Recoverable Initialisation Failure**: `database.GetDB()` uses `panic` (instead of `log.Fatalf`) when a connection cannot be established, so the `middleware.Recoverer` can intercept the failure, log a proper stack trace, and return a clean `500` JSON response rather than abruptly killing the server process.
+| **SQLite** | `Database::is_sqlite()` | File database at `database/app.db`. WAL mode enabled for high concurrency. |
+| **PostgreSQL** | `Database::is_postgres()` | Recommended for distributed cloud production deployments. |
+| **MySQL / MariaDB** | `Database::is_mysql()` | Standard production RDBMS support. |

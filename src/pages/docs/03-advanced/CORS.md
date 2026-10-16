@@ -2,7 +2,7 @@
 
 ## 🛡️ Secure Cross-Origin Policy Management
 
-Padi Go Framework provides built-in CORS handling via `middleware.Cors` with automatic preflight `OPTIONS` resolution.
+Padi Rust Framework provides built-in CORS handling powered by Tower HTTP's `CorsLayer` with automatic preflight `OPTIONS` resolution.
 
 ---
 
@@ -10,8 +10,7 @@ Padi Go Framework provides built-in CORS handling via `middleware.Cors` with aut
 
 - [🛡️ Secure Cross-Origin Policy Management](#secure-cross-origin-policy-management)
 - [⚙️ Configuration (`.env`)](#configuration-env)
-- [🛠️ Registering CORS Middleware](#registering-cors-middleware)
-- [🔧 Custom CORS Options in Go](#custom-cors-options-in-go)
+- [🛠️ How CORS Operates in Padi Rust](#how-cors-operates-in-padi-rust)
 - [🧪 Testing CORS with cURL](#testing-cors-with-curl)
 
 ---
@@ -22,71 +21,38 @@ Configure allowed domains directly in your `.env` file:
 
 ```env
 # Allow all origins (Development only)
-CORS_ALLOWED_ORIGINS="*"
+CORS_ALLOWED_ORIGINS=*
 
 # Specific origins (Recommended for Production)
-# CORS_ALLOWED_ORIGINS="https://myfrontend.com,https://admin.myfrontend.com"
+# CORS_ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com
 ```
 
 ---
 
-## 🛠️ Registering CORS Middleware
+## 🛠️ How CORS Operates in Padi Rust
 
-CORS middleware is registered on the router in `app/Routes/api.go`:
-
-```go
-package routes
-
-import (
-	"github.com/wibiesana/padi_go_core/middleware"
-	"github.com/wibiesana/padi_go_core/router"
-)
-
-func RegisterRoutes(r *router.Router) {
-	// Apply global CORS middleware
-	r.Use(middleware.Cors())
-
-	// Define routes...
-}
-```
-
----
-
-## 🔧 Custom CORS Options in Go
-
-You can supply custom parameters to `middleware.Cors`:
-
-```go
-opts := middleware.CorsOptions{
-	AllowedOrigins: []string{"https://app.example.com", "http://localhost:3000"},
-	AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-	AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-Response-Format"},
-	ExposedHeaders: []string{"Content-Length", "X-Total-Count"},
-	AllowCredentials: true,
-	MaxAge: 86400, // Cache preflight for 24 hours
-}
-
-r.Use(middleware.Cors(opts))
-```
+When the `Application` boots up in `src/main.rs`, it reads `CORS_ALLOWED_ORIGINS`:
+1. If set to `*`, it permits any origin.
+2. If set to a comma-separated list of origins, it validates that incoming request `Origin` headers match one of the allowed origins.
+3. Automatically permits standard headers: `Authorization`, `Content-Type`, `Accept`, and standard HTTP methods (`GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`).
 
 ---
 
 ## 🧪 Testing CORS with cURL
 
-Send a preflight `OPTIONS` request to verify CORS response headers:
+Send an `OPTIONS` preflight check to verify CORS headers:
 
 ```bash
-curl -I -X OPTIONS http://localhost:8080/users \
-  -H "Origin: https://myfrontend.com" \
+curl -I -X OPTIONS http://127.0.0.1:8080/users \
+  -H "Origin: https://app.example.com" \
   -H "Access-Control-Request-Method: POST" \
   -H "Access-Control-Request-Headers: Authorization, Content-Type"
 ```
 
 **Expected Response Headers:**
 ```http
-HTTP/1.1 204 No Content
-Access-Control-Allow-Origin: https://myfrontend.com
-Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
-Access-Control-Allow-Headers: Authorization, Content-Type
-Access-Control-Max-Age: 86400
+HTTP/1.1 200 OK
+access-control-allow-origin: https://app.example.com
+access-control-allow-methods: GET, POST, PUT, DELETE, OPTIONS
+access-control-allow-headers: authorization, content-type
 ```

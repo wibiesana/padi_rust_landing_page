@@ -13,8 +13,8 @@ export default {
   },
   // Hero Section
   hero: {
-    title: 'PADI REST API GO',
-    subtitle: 'The Industrial-Grade, Zero-Bloat Go REST API Framework for the Modern Web',
+    title: 'Padi Rust Api Framework',
+    subtitle: 'The Industrial-Grade, Zero-Bloat Rust REST API Framework for the Modern Web',
     getStarted: 'Get Started',
     documentation: 'Documentation'
   },
@@ -24,20 +24,20 @@ export default {
     titleSpeed: 'Speed',
     title2: 'Scaled for',
     titleIndustrial: 'Industrial',
-    desc: "PADI REST API GO isn't just another Go framework; it's a meticulously crafted REST API Generation Engine designed to transform your database schemas into production-ready Go services instantly.",
+    desc: "Padi Rust Api Framework isn't just another framework; it's a meticulously crafted REST API Generation Engine designed to transform your database schemas into production-ready Rust services instantly.",
     readBtn: 'Read the philosophy →',
     items: {
       p: {
         t: 'Performant',
-        d: 'Hyper-optimized execution core that extracts every ounce of speed and concurrency from native Go.'
+        d: 'Hyper-optimized execution core that extracts every ounce of speed, memory safety, and concurrency from native Rust.'
       },
       a: {
         t: 'Agile',
-        d: 'Generate complete CRUD endpoints, validations, models, and collections in seconds using our CLI generator.'
+        d: 'Generate complete CRUD endpoints, validations, models, resources, and routes in seconds using our CLI generator.'
       },
       d: {
         t: 'Dependable',
-        d: 'Robust, type-safe architecture that thrives under massive high concurrency workloads.'
+        d: 'Robust, memory-safe architecture that thrives under massive high concurrency workloads.'
       },
       i: {
         t: 'Intuitive',
@@ -52,36 +52,36 @@ export default {
     performanceTag: 'High Performance',
     items: {
       routing: {
-        t: 'Method-Indexed Routing',
-        d: 'Built on top of Chi with direct routes, group middleware, and dynamic URL parameters.'
+        t: 'Axum Fast Routing',
+        d: 'Built on top of Axum with modular routes, group middleware, and type-safe extractors.'
       },
       orm: {
-        t: 'ActiveRecord Generic ORM',
-        d: 'Type-safe generics for Go 1.22+, eager loading, schema introspection, and lifecycle hooks.'
+        t: 'ActiveRecord Multi-DB ORM',
+        d: 'Compile-time constant models, eager loading, schema introspection, and lifecycle hooks with SQLx.'
       },
       middleware: {
         t: 'Middleware Pipeline',
-        d: 'Intercept requests easily with built-in middleware for Auth, CORS, Panic Recovery, and Rate Limiting.'
+        d: 'Intercept requests easily with built-in Tower layers for Auth, CORS, Panic Recovery, and Compression.'
       },
       queue: {
         t: 'Integrated Queue System',
-        d: 'Offload long-running background tasks asynchronously using database job drivers.'
+        d: 'Offload long-running background tasks asynchronously using database-backed job workers.'
       },
       cache: {
-        t: 'In-Memory Cache & Storage',
-        d: 'Accelerate query and compute performance with memory-optimized cache mechanisms.'
+        t: 'Two-Tier Caching System',
+        d: 'Accelerate query performance with L1 in-memory cache and L2 SHA-256 hashed file storage.'
       },
       auth: {
-        t: 'Built-in JWT Auth',
-        d: 'Stateless token security out of the box with claims injection and password hashing.'
+        t: 'Built-in JWT Auth & RBAC',
+        d: 'Stateless token security out of the box with AuthUser extractor and Bcrypt password hashing.'
       },
       cli: {
         t: 'Powerful CLI Generator',
-        d: 'Generate Base/Custom Models, Controllers, and Postman Collections in a single command.'
+        d: 'Generate Models, Controllers, Resources, and Routes in a single command (padi g / padi ga).'
       },
       validation: {
         t: 'Strict Input Validation',
-        d: 'Robust validation engine supporting struct tags, email, min/max, and custom rules.'
+        d: 'Robust validation engine supporting rules, email, min/max, unique database checks, and custom rules.'
       },
       response: {
         t: 'Deterministic Response Payload',
@@ -93,7 +93,7 @@ export default {
   stats: {
     title: 'PERFORMANCE METRICS',
     subtitle: 'Precision Engineering.',
-    desc: 'Optimized for modern cloud clusters and serverless containers. Delivers high throughput without memory bloat.',
+    desc: 'Optimized for modern cloud clusters and native binaries. Delivers high throughput without memory bloat.',
     securityScore: 'Security Score',
     performance: 'Performance'
   },
@@ -109,9 +109,9 @@ export default {
     desc: 'No complex installation steps. Just clone the starter template, migrate, and start building.',
     steps: [
       'Clone Starter Template',
-      'Interactive Setup Wizard (Choose Database & JWT)',
-      'Generate Instant CRUD from Table (Scaffolding)',
-      'Launch Go Server'
+      'Interactive Setup Wizard (padi init)',
+      'Generate Instant CRUD from Table (padi g <table_name>)',
+      'Launch Rust Server (padi serve)'
     ]
   },
   // Learning Paths Section
@@ -122,10 +122,10 @@ export default {
     paths: {
       basics: {
         t: 'Core Basics',
-        d: 'Master PADI REST API GO fundamentals and build your first RESTful endpoints.',
+        d: 'Master Padi Rust Api Framework fundamentals and build your first RESTful endpoints.',
         steps: [
           'Introduction & Installation',
-          'Routing & Request Handling',
+          'Routing & Axum Request Handling',
           'Database & Query Builder',
           'Basic Input Validation'
         ]
@@ -144,9 +144,9 @@ export default {
         t: 'Production Deployment',
         d: 'Configure and optimize your server environment for maximum real-world throughput.',
         steps: [
-          'Lightweight Binary Compilation',
-          'PostgreSQL / MySQL Configurations',
-          'Multi-stage Docker setups (< 25MB)',
+          'Release Binary Compilation (cargo build --release)',
+          'PostgreSQL / MySQL / SQLite Configurations',
+          'Multi-stage Docker setups',
           'Production Security & Nginx Reverse Proxy'
         ]
       }
@@ -156,7 +156,7 @@ export default {
   cta: {
     title1: 'Ready to Experience',
     title2: 'Raw Power?',
-    desc: 'Join the ecosystem of engineers building industrial REST services with Go. Stop wrestle, start shipping.',
+    desc: 'Join the ecosystem of engineers building industrial REST services with Rust. Stop wrestling, start shipping.',
     installBtn: 'Install Framework'
   }
 }

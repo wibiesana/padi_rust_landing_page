@@ -3,9 +3,9 @@
   color: #f3f4f6;
 }
 
-.text-accent-cyan,
-.text-accent-go {
-  color: #00ADD8;
+.text-accent-rust,
+.text-accent-orange {
+  color: #e05d44;
 }
 
 .text-gradient {
@@ -13,7 +13,7 @@
   -webkit-background-clip: unset;
   background-clip: unset;
   -webkit-text-fill-color: initial;
-  color: #00ADD8;
+  color: #e05d44;
 }
 
 .glass-card {
@@ -41,7 +41,7 @@
   font-family: 'Fira Code', monospace;
   font-size: 0.9rem;
   color: #e5e7eb;
-  border-left: 4px solid #00ADD8;
+  border-left: 4px solid #e05d44;
 }
 
 .feature-card {
@@ -49,6 +49,6 @@
   border: 1px solid #1f2937;
   &:hover {
     transform: translateY(-3px);
-    border-color: #00ADD8;
+    border-color: #e05d44;
   }
 }

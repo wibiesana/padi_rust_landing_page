@@ -1,56 +1,56 @@
-# 📑 API Collections & Postman / Thunder Client Guide
+# 📑 API Collections & Testing Tools Guide
 
-Every time you generate CRUD for a table using `go run cmd/padi/main.go g <table_name>`, Padi automatically creates an API Collection JSON file in `api_collection/<table_name>_api_collection.json`.
+Every time you build or scaffold endpoints in Padi Rust Framework, the endpoints adhere to standard REST conventions with deterministic URLs and payloads.
 
 ---
 
 ## 📋 Table of Contents
 
-- [📑 API Collections & Postman / Thunder Client Guide](#api-collections--postman--thunder-client-guide)
-- [📦 Generated API Collection Files](#generated-api-collection-files)
-- [🚀 Importing into Postman](#importing-into-postman)
-- [⚡ Importing into Thunder Client (VS Code)](#importing-into-thunder-client-vs-code)
+- [📑 API Collections & Testing Tools Guide](#api-collections--testing-tools-guide)
+- [📦 Standard CRUD Endpoints](#standard-crud-endpoints)
+- [🚀 Postman & Thunder Client Configuration](#postman--thunder-client-configuration)
 - [🎯 Direct URL Standard](#direct-url-standard)
 
 ---
 
-## 📦 Generated API Collection Files
+## 📦 Standard CRUD Endpoints
 
-The file contains ready-to-test requests for all endpoints:
+All resources generated or developed in Padi Rust provide the following standard endpoints:
 
-1. **List Paginated (`GET {{base_url}}/<resource>?page=1&per_page=15`)**
-2. **List All (`GET {{base_url}}/<resource>/all`)**
-3. **Show by ID (`GET {{base_url}}/<resource>/1`)**
-4. **Create (`POST {{base_url}}/<resource>`)** with sample JSON payload
-5. **Update (`PUT {{base_url}}/<resource>/1`)** with sample JSON payload
-6. **Delete (`DELETE {{base_url}}/<resource>/1`)**
-
----
-
-## 🚀 Importing into Postman
-
-1. Open Postman.
-2. Click **Import** (top left).
-3. Select `api_collection/<table_name>_api_collection.json`.
-4. Set the collection variable `base_url` to `http://localhost:8080`.
-5. Set `token` variable to your Bearer JWT token.
+| Action | Method | URL Path | Query Parameters | Description |
+| :--- | :---: | :--- | :--- | :--- |
+| **List (Paginated)** | `GET` | `/<resource>` | `?page=1&per_page=15` | Retrieves paginated entities with metadata |
+| **List All** | `GET` | `/<resource>/all` | - | Retrieves all entities without pagination |
+| **Show** | `GET` | `/<resource>/{id}` | - | Retrieves a single entity by ID |
+| **Create** | `POST` | `/<resource>` | - | Creates a new record |
+| **Update** | `PUT` | `/<resource>/{id}` | - | Updates an existing record |
+| **Delete** | `DELETE` | `/<resource>/{id}` | - | Deletes a record |
 
 ---
 
-## ⚡ Importing into Thunder Client (VS Code)
+## 🚀 Postman & Thunder Client Configuration
 
-1. Open the Thunder Client extension in VS Code.
-2. Go to **Collections** $\rightarrow$ **Import**.
-3. Select `api_collection/<table_name>_api_collection.json`.
+### 1. Environment Variables Setup
+Create an environment in Postman or Thunder Client with:
+- `base_url`: `http://127.0.0.1:8080`
+- `token`: `<YOUR_JWT_TOKEN>`
+
+### 2. Header Presets
+Set standard HTTP headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `Bearer {{token}}`
 
 ---
 
 ## 🎯 Direct URL Standard
 
-All endpoints use direct root routes:
+Padi Rust endpoints use clean, direct root paths:
 
-```
-{{base_url}}/products
-{{base_url}}/products/all
-{{base_url}}/products/1
+```http
+GET {{base_url}}/products?page=1&per_page=10
+GET {{base_url}}/products/all
+GET {{base_url}}/products/1
+POST {{base_url}}/products
+PUT {{base_url}}/products/1
+DELETE {{base_url}}/products/1
 ```

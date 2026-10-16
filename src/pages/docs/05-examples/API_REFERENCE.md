@@ -1,6 +1,6 @@
 # 📋 API Quick Reference
 
-A fast cheatsheet for Padi Go REST API.
+A fast cheatsheet for Padi Rust REST API.
 
 ---
 
@@ -12,9 +12,11 @@ A fast cheatsheet for Padi Go REST API.
 | :--- | :--- | :--- | :---: |
 | `POST` | `/auth/register` | Register new user account | ❌ |
 | `POST` | `/auth/login` | Login and obtain Bearer JWT token | ❌ |
+| `POST` | `/auth/refresh` | Refresh existing JWT token | ✅ |
+| `POST` | `/auth/logout` | Client logout / invalidate session | ✅ |
+| `GET` | `/auth/me` | Fetch authenticated user profile | ✅ |
 | `POST` | `/auth/password/forgot` | Request password reset token | ❌ |
 | `POST` | `/auth/password/reset` | Reset password using token | ❌ |
-| `GET` | `/auth/me` | Fetch authenticated user profile | ✅ |
 
 ---
 
@@ -22,12 +24,12 @@ A fast cheatsheet for Padi Go REST API.
 
 | Method | Endpoint | Return Key | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/<resource>?page=1&per_page=15` | `"items": [...]`, `"meta": {...}` | List paginated entities with search & sort |
+| `GET` | `/<resource>?page=1&per_page=15` | `"items": [...]`, `"meta": {...}` | List paginated entities with sort |
 | `GET` | `/<resource>/all` | `"items": [...]` | List all unpaginated entities |
 | `GET` | `/<resource>/{id}` | `"item": {...}` | Retrieve single entity by ID |
 | `POST` | `/<resource>` | `"item": {...}` | Create new entity (Status: 201 Created) |
 | `PUT` | `/<resource>/{id}` | `"item": {...}` | Update existing entity |
-| `DELETE` | `/<resource>/{id}` | `"success": true` | Delete entity |
+| `DELETE` | `/<resource>/{id}` | - | Delete entity (Status: 204 No Content) |
 
 ---
 
@@ -35,16 +37,27 @@ A fast cheatsheet for Padi Go REST API.
 
 ```bash
 # Start server
-go run cmd/padi/main.go serve
+padi serve
+# Or: cargo run
 
 # Database migrations
-go run cmd/padi/main.go migrate
-go run cmd/padi/main.go migrate:rollback
+padi migrate
+padi migrate:rollback
+padi migrate:status
 
 # Scaffolding
-go run cmd/padi/main.go g <table_name>
-go run cmd/padi/main.go ga
+padi g <table_name>
+padi ga
+
+# Make individual components
+padi make:controller <Name>
+padi make:model <table_name>
+padi make:resource <Name>
+padi make:migration <name>
 
 # Queue Worker
-go run cmd/padi/main.go queue:work
+padi queue:work
+
+# Interactive Setup Wizard
+padi init
 ```

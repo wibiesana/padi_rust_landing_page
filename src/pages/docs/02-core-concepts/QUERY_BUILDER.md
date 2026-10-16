@@ -1,8 +1,8 @@
-# 🔍 Query Builder in Padi Go Framework
+# 🔍 Query Builder in Padi Rust Framework
 
 ## 💎 Fluent, Safe, and Database-Agnostic Querying
 
-The **Padi Query Builder** provides a fluent, expressive interface to construct and execute database queries safely with automatic parameter binding and SQL injection prevention.
+The **Padi Query Builder** (`padi_core::query::Query`) provides a fluent, expressive interface to construct and execute database queries safely with automatic parameterized value binding and SQL injection prevention.
 
 ---
 
@@ -12,233 +12,188 @@ The **Padi Query Builder** provides a fluent, expressive interface to construct 
 - [🚀 Basic Usage](#basic-usage)
 - [🔍 Selecting Columns & Distinct](#selecting-columns--distinct)
 - [🎯 Where Clauses](#where-clauses)
-  - [Simple Where & Multiple Conditions](#simple-where--multiple-conditions)
-  - [WhereIn & WhereNotIn](#wherein--wherenotin)
-  - [WhereBetween & WhereNotBetween](#wherebetween--wherenotbetween)
-  - [WhereNull & WhereNotNull](#wherenull--wherenotnull)
-  - [WhereNot (Negated Conditions)](#wherenot-negated-conditions)
-  - [FilterWhere & OrFilterWhere (Smart Optional Filters)](#filterwhere--orFilterwhere-smart-optional-filters)
-  - [Search (Multi-Column Search)](#search-multi-column-search)
+  - [Equality & Comparison Operators](#equality--comparison-operators)
+  - [Where In & Where Not In](#where-in--where-not-in)
+  - [Where Between](#where-between)
+  - [Where Null & Where Not Null](#where-null--where-not-null)
+  - [Smart Filtering (`filter_where`)](#smart-filtering-filter_where)
 - [🔗 Joins](#joins)
-- [📊 Aggregates (Count, Sum, Avg, Min, Max)](#aggregates-count-sum-avg-min-max)
+- [📊 Aggregates & Counts](#aggregates--counts)
 - [📑 Ordering, Grouping, & Pagination](#ordering-grouping--pagination)
-- [⚡ Direct Mutation (Insert, Update, Delete)](#direct-mutation-insert-update-delete)
+- [🔒 Row Locking (`FOR UPDATE`)](#row-locking-for-update)
 
 ---
 
 ## 🚀 Basic Usage
 
-### 1. Type-Safe Generic Execution (`GetAll` & `GetFirst`)
-```go
-import "github.com/wibiesana/padi_go_core/query"
+Create a query instance using `Query::table("table_name")` or via model `.find_query()`:
 
-// Query products and return directly as []Product
-products, err := query.GetAll[Product](
-    query.New("products").
-        Where("status", "active").
-        OrderBy("price", "DESC").
-        Limit(10),
-)
+```rust
+use padi_core::prelude::*;
 
-// Query single product as *Product
-product, err := query.GetFirst[Product](
-    query.New("products").Where("id", 42),
-)
-```
+// Fetch a list of active products
+let products: Vec<Value> = Query::table("products")
+    .where_eq("status", "active")
+    .order_by("price", "DESC")
+    .limit(10)
+    .get()
+    .await?;
 
-### 2. Traditional Scan into Struct Slice
-```go
-var products []Product
-err := query.New("products").
-    Where("status", "active").
-    OrderBy("price", "DESC").
-    Limit(10).
-    All(&products)
+// Fetch a single record
+let product: Option<Value> = Query::table("products")
+    .where_eq("id", 42)
+    .first()
+    .await?;
 ```
 
 ---
 
 ## 🔍 Selecting Columns & Distinct
 
-```go
+```rust
 // Select specific columns
-query.New("users").Select("id", "name", "email")
+Query::table("users").select(&["id", "name", "email"]);
 
-// Add select dynamically
-q := query.New("users").Select("id", "name")
-q.AddSelect("created_at")
+// Add extra columns dynamically
+let mut q = Query::table("users").select(&["id", "name"]);
+q = q.add_select(&["created_at"]);
 
-// Distinct query
-query.New("users").Distinct().Select("role")
+// Distinct selection
+Query::table("users").distinct().select(&["role"]);
 ```
 
 ---
 
 ## 🎯 Where Clauses
 
-### Simple Where & Multiple Conditions
-```go
+### Equality & Comparison Operators
+```rust
 // Equality
-query.New("users").Where("status", "active")
+Query::table("users").where_eq("status", "active");
 
-// Custom Operators (<, >, <=, >=, !=, LIKE, ILIKE)
-query.New("products").Where("price", ">=", 100)
-query.New("users").Where("email", "LIKE", "%@gmail.com")
+// Comparisons: gt (>), gte (>=), lt (<), lte (<=), not_eq (!=)
+Query::table("products").where_gte("price", 100);
+Query::table("users").where_not_eq("role", "banned");
 
-// Multiple WHERE (AND / OR)
-query.New("products").
-    Where("category", "Electronics").
-    AndWhere("price", "<", 500).
-    OrWhere("is_featured", true)
+// Pattern Matching (LIKE / ILIKE)
+Query::table("users").where_like("email", "%@example.com");
+
+// OR Conditions
+Query::table("products")
+    .where_eq("category", "Electronics")
+    .or_where_gt("stock", 0);
 ```
 
-### WhereIn & WhereNotIn
-```go
-// Slice or variadic parameters
-query.New("orders").WhereIn("status", "pending", "processing", "shipped")
-query.New("users").WhereNotIn("role", "banned", "deleted")
+### Where In & Where Not In
+```rust
+Query::table("orders")
+    .where_in("status", &[Val::from("pending"), Val::from("processing")]);
+
+Query::table("users")
+    .where_not_in("role", &[Val::from("banned"), Val::from("deleted")]);
 ```
 
-### WhereBetween & WhereNotBetween
-```go
-query.New("products").WhereBetween("price", 50.0, 200.0)
-query.New("logs").WhereNotBetween("created_at", "2026-01-01", "2026-01-31")
+### Where Between
+```rust
+Query::table("products").where_between("price", 50, 200);
 ```
 
-### WhereNull & WhereNotNull
-```go
-query.New("users").WhereNull("deleted_at")
-query.New("orders").WhereNotNull("shipped_at")
+### Where Null & Where Not Null
+```rust
+Query::table("articles").where_null("deleted_at");
+Query::table("users").where_not_null("email_verified_at");
 ```
 
-### WhereNot (Negated Conditions)
-`WhereNot`, `AndWhereNot`, and `OrWhereNot` add negated `NOT (col op val)` conditions:
-
-```go
-// NOT (status = 'banned') — default equality operator
-query.New("users").WhereNot("status", "banned")
-
-// NOT (price >= 1000) — custom operator
-query.New("products").WhereNot("price", ">=", 1000)
-
-// Chaining AND NOT / OR NOT
-query.New("orders").
-    Where("user_id", userID).
-    AndWhereNot("status", "cancelled").
-    OrWhereNot("status", "refunded")
-```
-
-### FilterWhere & OrFilterWhere (Smart Optional Filters)
-`FilterWhere` automatically skips a condition when the value is considered empty: `nil`, empty string `""`, or empty slice/map. This makes building search forms effortless — no manual `if` checks required:
-
-```go
-// Each condition is only added if the value is non-empty.
-// An empty searchCategory or 0 minPrice simply produces no SQL clause.
-query.New("products").
-    FilterWhere("category", searchCategory).
-    FilterWhere("status", searchStatus).
-    FilterWhere("price", ">=", minPrice) // skipped when minPrice == 0 or nil
-
-// OrFilterWhere adds OR conditions with the same skip logic
-query.New("users").
-    Where("role", "admin").
-    OrFilterWhere("email", searchEmail)
-```
-
-> **Tip**: `FilterWhere` uses `isEmpty()` internally — it handles `nil`, `""`, and zero-length slices/maps uniformly, so you never need to guard optional filters manually.
-
-### Search (Multi-Column Search)
-```go
-// Searches across multiple columns with ILIKE / LIKE
-query.New("articles").Search("Golang Tutorial", "title", "content", "tags")
+### Smart Filtering (`filter_where`)
+`filter_where` ignores conditions if the given value is `None`, empty string, or null:
+```rust
+// Automatically skipped if search_keyword is empty:
+let mut q = Query::table("products");
+if !keyword.is_empty() {
+    q = q.filter_where_like("name", format!("%{}%", keyword));
+}
 ```
 
 ---
 
 ## 🔗 Joins
 
-```go
+```rust
 // Inner Join
-query.New("articles").
-    Join("users", "users.id", "=", "articles.author_id")
+Query::table("orders")
+    .join("users", "orders.user_id", "=", "users.id")
+    .select(&["orders.*", "users.name as customer_name"]);
 
 // Left Join
-query.New("articles").
-    LeftJoin("categories", "categories.id", "=", "articles.category_id")
-
-// Right Join
-query.New("users").
-    RightJoin("orders", "orders.user_id", "=", "users.id")
+Query::table("articles")
+    .left_join("categories", "articles.category_id", "=", "categories.id");
 ```
 
 ---
 
-## 📊 Aggregates (Count, Sum, Avg, Min, Max)
+## 📊 Aggregates & Counts
 
-```go
-// 1. Count
-count, err := query.New("users").Where("status", "active").Count()
+```rust
+// Count matching rows:
+let total: u64 = Query::table("users")
+    .where_eq("status", "active")
+    .count()
+    .await?;
 
-// 2. Exists
-exists, err := query.New("users").Where("email", "john@example.com").Exists()
+// Check if a row exists:
+let exists: bool = Query::table("users")
+    .where_eq("email", "alex@example.com")
+    .exists()
+    .await?;
 
-// 3. Sum
-totalRevenue, err := query.New("orders").Where("status", "paid").Sum("total_amount")
-
-// 4. Average
-avgPrice, err := query.New("products").Avg("price")
-
-// 5. Min & Max
-minPrice, err := query.New("products").Min("price")
-maxPrice, err := query.New("products").Max("price")
+// Pluck column values into a vector:
+let ids: Vec<Value> = Query::table("products")
+    .where_gt("stock", 0)
+    .pluck("id")
+    .await?;
 ```
 
 ---
 
 ## 📑 Ordering, Grouping, & Pagination
 
-```go
-// Ordering
-query.New("products").
-    OrderBy("created_at", "DESC").
-    AddOrderBy("price", "ASC")
+```rust
+// Order by column:
+Query::table("posts").order_by("created_at", "DESC");
 
-// GroupBy & Having
-query.New("orders").
-    Select("user_id", "COUNT(*) as total_orders").
-    GroupBy("user_id").
-    Having("COUNT(*)", ">", 5)
+// Group by and Having:
+Query::table("orders")
+    .select(&["user_id", "COUNT(*) as total_orders"])
+    .group_by(&["user_id"])
+    .having("total_orders > ?", &[Val::from(5)]);
 
-// Pagination Helper
-var items []Product
-meta, err := query.New("products").
-    Where("status", "active").
-    Paginate(1, 15, &items)
-// meta contains: Total, PerPage, CurrentPage, LastPage, From, To
+// Limit and Offset:
+Query::table("logs").limit(50).offset(100);
+
+// Built-in pagination:
+let paged_result: Value = Query::table("products")
+    .where_eq("status", "active")
+    .paginate(1, 15)
+    .await?;
 ```
 
 ---
 
-## ⚡ Direct Mutation (Insert, Update, Delete)
+## 🔒 Row Locking (`FOR UPDATE`)
 
-```go
-// Direct Insert
-newID, err := query.New("logs").Insert(map[string]interface{}{
-    "action":     "user_login",
-    "ip_address": "127.0.0.1",
-    "created_at": time.Now(),
-})
+For transaction isolation and concurrency protection:
+```rust
+// Pessimistic write lock:
+Query::table("accounts")
+    .where_eq("id", 1)
+    .lock_for_update()
+    .first()
+    .await?;
 
-// Direct Update
-affectedRows, err := query.New("users").
-    Where("status", "pending").
-    Where("created_at", "<", time.Now().AddDate(0, -1, 0)).
-    Update(map[string]interface{}{
-        "status": "expired",
-    })
-
-// Direct Delete
-deletedRows, err := query.New("sessions").
-    Where("expired_at", "<", time.Now()).
-    Delete()
+// Shared read lock:
+Query::table("inventory")
+    .where_eq("item_id", 42)
+    .shared_lock()
+    .first()
+    .await?;
 ```

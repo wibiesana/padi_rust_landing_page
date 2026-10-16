@@ -1,6 +1,6 @@
 # 👣 First Steps Guide
 
-Welcome! This guide walks you through your first API calls with Padi Go Framework.
+Welcome! This guide walks you through your first API calls with Padi Rust Framework.
 
 ---
 
@@ -9,7 +9,7 @@ Welcome! This guide walks you through your first API calls with Padi Go Framewor
 Send a `POST` request to `/auth/register`:
 
 ```bash
-curl -X POST http://localhost:8080/auth/register \
+curl -X POST http://127.0.0.1:8080/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Alex Dev",
@@ -29,7 +29,9 @@ curl -X POST http://localhost:8080/auth/register \
       "id": 1,
       "name": "Alex Dev",
       "email": "alex@example.com",
-      "role": "user"
+      "role": "user",
+      "created_at": "2026-10-16 14:00:00",
+      "updated_at": "2026-10-16 14:00:00"
     },
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
@@ -43,7 +45,7 @@ curl -X POST http://localhost:8080/auth/register \
 Send a `POST` request to `/auth/login`:
 
 ```bash
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://127.0.0.1:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "alex@example.com",
@@ -51,14 +53,16 @@ curl -X POST http://localhost:8080/auth/login \
   }'
 ```
 
+The response includes the signed JWT Bearer token valid for all protected routes.
+
 ---
 
 ## 3. Access Protected Route (`/auth/me`)
 
-Send a `GET` request with the Bearer JWT token:
+Send a `GET` request with the Bearer JWT token in the `Authorization` header:
 
 ```bash
-curl -X GET http://localhost:8080/auth/me \
+curl -X GET http://127.0.0.1:8080/auth/me \
   -H "Authorization: Bearer <YOUR_JWT_TOKEN>"
 ```
 
@@ -72,7 +76,9 @@ curl -X GET http://localhost:8080/auth/me \
     "id": 1,
     "name": "Alex Dev",
     "email": "alex@example.com",
-    "role": "user"
+    "role": "user",
+    "created_at": "2026-10-16 14:00:00",
+    "updated_at": "2026-10-16 14:00:00"
   }
 }
 ```
@@ -81,28 +87,77 @@ curl -X GET http://localhost:8080/auth/me \
 
 ## 4. Scaffold Your First Custom Resource
 
-Create a table in your database, then run the Padi Generator:
+### Step A: Create and Run a Migration
+```bash
+# Generate a new migration file:
+padi make:migration create_products_table
+```
+
+Edit the generated file in `database/migrations/<timestamp>_create_products_table.sql`:
+```sql
+CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(150) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    stock INTEGER NOT NULL DEFAULT 0,
+    created_at VARCHAR(19),
+    updated_at VARCHAR(19)
+);
+
+-- +down
+DROP TABLE IF EXISTS products;
+```
+
+Run the migration:
+```bash
+padi migrate
+```
+
+### Step B: Generate CRUD
+Run the Padi Generator for the `products` table:
 
 ```bash
-go run cmd/padi/main.go g products
+padi g products
 ```
 
-This generates:
-- Base Model (`app/Models/Base/Product.go`)
-- Custom Model (`app/Models/Product.go`)
-- Base Controller (`app/Controllers/Base/ProductController.go`)
-- Custom Controller (`app/Controllers/ProductController.go`)
-- Postman Collection (`api_collection/product_api_collection.json`)
+This automatically generates and links:
+- **Model:** `src/models/product.rs` (introspects table columns and registers in `src/models/mod.rs`)
+- **Resource:** `src/resources/product.rs` (registered in `src/resources/mod.rs`)
+- **Controller:** `src/controllers/products.rs` (registered in `src/controllers/mod.rs`)
+- **Route:** `src/routes/products.rs` (automatically mounted in `src/routes/mod.rs` via `.nest("/products", products::routes())`)
 
-Register the route in `app/Routes/api.go`:
-```go
-prodCtrl := controllers.NewProductController()
-r.Mux.Route("/products", func(r chi.Router) {
-    r.Get("/", prodCtrl.Index)
-    r.Get("/all", prodCtrl.All)
-    r.Post("/", prodCtrl.Store)
-    r.Get("/{id}", prodCtrl.Show)
-    r.Put("/{id}", prodCtrl.Update)
-    r.Delete("/{id}", prodCtrl.Destroy)
-})
-```
+### Step C: Test Your New API Endpoints
+- **List products (paginated):**
+  ```bash
+  curl http://127.0.0.1:8080/products?page=1&per_page=10 \
+    -H "Authorization: Bearer <TOKEN>"
+  ```
+- **Fetch all products (unpaginated):**
+  ```bash
+  curl http://127.0.0.1:8080/products/all \
+    -H "Authorization: Bearer <TOKEN>"
+  ```
+- **Create a product:**
+  ```bash
+  curl -X POST http://127.0.0.1:8080/products \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <TOKEN>" \
+    -d '{"name": "Mechanical Keyboard", "price": 99.99, "stock": 50}'
+  ```
+- **Show product details:**
+  ```bash
+  curl http://127.0.0.1:8080/products/1 \
+    -H "Authorization: Bearer <TOKEN>"
+  ```
+- **Update a product:**
+  ```bash
+  curl -X PUT http://127.0.0.1:8080/products/1 \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <TOKEN>" \
+    -d '{"price": 89.99}'
+  ```
+- **Delete a product:**
+  ```bash
+  curl -X DELETE http://127.0.0.1:8080/products/1 \
+    -H "Authorization: Bearer <TOKEN>"
+  ```

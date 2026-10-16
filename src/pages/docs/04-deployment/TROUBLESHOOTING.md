@@ -1,15 +1,18 @@
 # 🔧 Deployment Troubleshooting Guide
 
-Solutions for common deployment, networking, and runtime issues in Padi Go Framework.
+Solutions for common deployment, networking, and runtime issues in Padi Rust Framework.
 
 ---
 
 ## 📋 Common Issues & Resolutions
 
-### 1. Port Conflict (`bind: address already in use`)
-- **Cause**: Another process or previous instance is running on `APP_PORT` (default `8080`).
+### 1. Port Conflict (`os error 10048` or `address already in use`)
+- **Cause**: Another process or a previous instance is occupying `APP_PORT` (default: `8080`).
 - **Fix**:
-  - Change `APP_PORT=8085` in `.env`.
+  - Run the server with a port override:
+    ```bash
+    padi serve --port=8085
+    ```
   - Or terminate the conflicting process:
     ```bash
     # Windows
@@ -24,20 +27,20 @@ Solutions for common deployment, networking, and runtime issues in Padi Go Frame
 ---
 
 ### 2. Database Connection Refused
-- **Cause**: MySQL or PostgreSQL service is not reachable at `DB_HOST:DB_PORT`.
+- **Cause**: MySQL or PostgreSQL service is not reachable at the host and port specified in `DATABASE_URL` or `.env`.
 - **Fix**:
   - Verify container/service status: `docker ps` or `systemctl status postgresql`.
-  - Check credentials in `.env` (`DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`).
-  - For SQLite, ensure the parent directory (`database/`) has read/write permissions.
+  - Check credentials in `.env` (`DATABASE_URL`, `DB_USERNAME`, `DB_PASSWORD`).
+  - For SQLite, ensure the parent directory (`database/`) has read and write permissions.
 
 ---
 
 ### 3. Migrations Fail (`Table already exists`)
 - **Cause**: Table was created manually outside the migration runner.
 - **Fix**:
-  - Drop the orphan table or rollback the last migration:
+  - Roll back the latest migration batch:
     ```bash
-    go run cmd/padi/main.go migrate:rollback
+    padi migrate:rollback
     ```
 
 ---
@@ -47,16 +50,16 @@ Solutions for common deployment, networking, and runtime issues in Padi Go Frame
 - **Fix**:
   - Add your frontend domain in `.env`:
     ```env
-    CORS_ALLOWED_ORIGINS="http://localhost:3000,https://app.mydomain.com"
+    CORS_ALLOWED_ORIGINS=http://localhost:3000,https://app.mydomain.com
     ```
 
 ---
 
 ### 5. JWT Unauthorized (`401 Unauthorized`)
-- **Cause**: `Authorization` header missing or formatted incorrectly.
+- **Cause**: `Authorization` header missing, or `JWT_SECRET` does not match.
 - **Fix**:
   - Ensure the header value includes the `Bearer ` prefix:
     ```http
     Authorization: Bearer <TOKEN_HERE>
     ```
-  - Verify that `JWT_SECRET` matches across server restarts.
+  - Ensure that `JWT_SECRET` in `.env` remains consistent across server restarts and is at least 32 characters long.

@@ -1,6 +1,6 @@
 # 🛡️ Security Best Practices & Hardening
 
-Security guidelines and built-in protections provided by Padi REST API Go Framework.
+Security guidelines and built-in protections provided by Padi Rust Api Framework.
 
 ---
 
@@ -10,37 +10,40 @@ Security guidelines and built-in protections provided by Padi REST API Go Framew
 - [🔒 1. SQL Injection Prevention](#1-sql-injection-prevention)
 - [🔑 2. Password Hashing (Bcrypt)](#2-password-hashing-bcrypt)
 - [🎫 3. Stateless JWT Bearer Token Security](#3-stateless-jwt-bearer-token-security)
-- [🚦 4. Rate Limiting Middleware](#4-rate-limiting-middleware)
-- [🌐 5. CORS Hardening](#5-cors-hardening)
-- [🛡️ 6. Input Validation & Sanitization](#6-input-validation--sanitization)
+- [🌐 4. CORS Hardening](#4-cors-hardening)
+- [🛡️ 5. Input Validation & Sanitization](#5-input-validation--sanitization)
+- [📁 6. File Upload Traversal & Extension Hardening](#6-file-upload-traversal--extension-hardening)
 
 ---
 
 ## 🔒 1. SQL Injection Prevention
 
-The Padi Query Builder and ActiveRecord utilize prepared statements with parameterized inputs (`?` or `$1, $2`), completely neutralizing SQL injection risks:
+The Padi Query Builder (`Query::table`) and ActiveRecord utilize prepared statements with parameterized inputs (`Val::from(...)`), eliminating SQL injection risks:
 
-```go
-// Always parameterized
-query.New("users").Where("email", userSuppliedEmail).First(&user)
+```rust
+// Inputs are always bound as parameters, never concatenated
+Query::table("users")
+    .where_eq("email", user_supplied_email)
+    .first()
+    .await?;
 ```
 
-In addition, column names in `UPDATE` SET clauses are **automatically quoted** (`` `col` `` for MySQL/SQLite, `"col"` for PostgreSQL) to prevent reserved-word conflicts and identifier injection from unusual column names.
+In addition, column and table identifiers are strictly validated against injection patterns before query compilation.
 
 ---
 
 ## 🔑 2. Password Hashing (Bcrypt)
 
-All user passwords are encrypted using Bcrypt with adaptive work factors:
+All user passwords are encrypted using Bcrypt via `padi_core::hash`:
 
-```go
-import "github.com/wibiesana/padi_go_core/auth"
+```rust
+use padi_core::hash;
 
-// Hash password
-hashed, _ := auth.HashPassword(plainPassword)
+// Hash password:
+let hashed = hash::make(plain_password);
 
-// Verify password
-isValid := auth.VerifyPassword(hashed, inputPassword)
+// Verify password:
+let is_valid = hash::check(input_password, &hashed);
 ```
 
 ---
@@ -48,44 +51,44 @@ isValid := auth.VerifyPassword(hashed, inputPassword)
 ## 🎫 3. Stateless JWT Bearer Token Security
 
 Tokens use HMAC SHA-256 signatures with configured expiration:
-
-- Signed using `JWT_SECRET` from `.env`.
+- Signed using `JWT_SECRET` from `.env` (the framework enforces a minimum of 32 characters and rejects weak or default secrets).
 - Transmitted in HTTP Header: `Authorization: Bearer <token>`.
-- Inspected by `middleware.AuthRequired`.
+- Verified cryptographically via the `AuthUser` extractor.
 
 ---
 
-## 🚦 4. Rate Limiting Middleware
+## 🌐 4. CORS Hardening
 
-Protect your API against brute-force and DDoS attacks by enabling the rate limiter in `app/Routes/api.go`:
-
-```go
-// Allow maximum 60 requests per minute per IP
-r.Use(middleware.RateLimit(60, 60))
-```
-
-> **IP Identification**: The rate limiter reads `X-Forwarded-For` (first IP only, whitespace-trimmed) with fallback to `RemoteAddr`. Expired IP buckets are swept every minute by a background goroutine to prevent unbounded memory growth under long-running deployments.
-
----
-
-## 🌐 5. CORS Hardening
-
-In production, never use `CORS_ALLOWED_ORIGINS="*"`. Instead, restrict to trusted frontend domains:
+In production, avoid wildcards (`*`) and specify your exact domains in `.env`:
 
 ```env
-CORS_ALLOWED_ORIGINS="https://app.yourdomain.com,https://admin.yourdomain.com"
+CORS_ALLOWED_ORIGINS=https://app.yourdomain.com,https://admin.yourdomain.com
 ```
 
 ---
 
-## 🛡️ 6. Input Validation & Sanitization
+## 🛡️ 5. Input Validation & Sanitization
 
-Always validate request payloads using `validator.BindJSON`:
+Always validate incoming request bodies using `Validator`:
 
-```go
-type CreateArticleRequest struct {
-	Title   string `json:"title" validate:"required,min=5,max=200"`
-	Content string `json:"content" validate:"required"`
-	Email   string `json:"author_email" validate:"required,email"`
-}
+```rust
+let d = Validator::new(
+    &body,
+    &[
+        ("name", "required|string|min:2|max:100"),
+        ("email", "required|email|unique:users,email"),
+    ],
+)
+.validate()
+.await?;
 ```
+
+---
+
+## 📁 6. File Upload Traversal & Extension Hardening
+
+`padi_core::file::File` enforces:
+1. **Blacklist of Dangerous Extensions:** `.php`, `.exe`, `.bat`, `.sh`, `.py`, `.js`, `.dll`, etc.
+2. **Whitelist Validation:** Rejects any extension not explicitly specified in `UploadOptions.allowed_types`.
+3. **Randomized UUIDs:** Filenames are replaced with unguessable UUID v4 strings to prevent enumeration and overwriting attacks.
+4. **Path Traversal Protection:** Validates paths to keep files within `storage/uploads`.

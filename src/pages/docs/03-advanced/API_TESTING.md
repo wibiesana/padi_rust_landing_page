@@ -1,77 +1,77 @@
 # 🧪 API Testing Guide
 
-Padi Go Framework is built with pure Go standards, making unit and integration testing fast and frictionless using Go's built-in `testing` and `net/http/httptest` packages.
+Padi Rust Framework is built with standard Rust conventions, making unit and integration testing fast, type-safe, and reliable using Cargo's built-in testing framework and Tower/Axum test utilities.
 
 ---
 
 ## 📋 Writing Integration Tests
 
-Create integration tests in `app/Controllers/integration_test.go`:
+Create integration tests in `tests/api_test.rs`:
 
-```go
-package controllers_test
+```rust
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
+use padi_core::prelude::*;
+use serde_json::json;
+use tower::ServiceExt; // for `oneshot`
 
-import (
-	"bytes"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"testing"
+#[tokio::test]
+async fn test_auth_and_health_flow() {
+    // 1. Initialize environment & in-memory test database
+    std::env::set_var("DB_DRIVER", "sqlite");
+    std::env::set_var("DB_DATABASE", ":memory:");
+    std::env::set_var("JWT_SECRET", "super-secret-random-jwt-key-must-be-32-chars");
 
-	"padi-template/app/Routes"
-	"github.com/wibiesana/padi_go_core/database"
-	"github.com/wibiesana/padi_go_core/router"
-)
+    let _ = Database::connect().await;
 
-func setupTestRouter() *router.Router {
-	// Initialize in-memory SQLite for instant, isolated tests
-	_ = database.InitDB(database.Config{
-		Driver:   "sqlite",
-		Database: "file:test_mem?mode=memory&cache=shared",
-	})
+    // Build the Axum router
+    let app = padi_rust::routes::api();
 
-	r := router.New()
-	routes.RegisterRoutes(r)
-	return r
-}
+    // 2. Test root health check
+    let response = app
+        .clone()
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
 
-func TestRegisterAndLoginFlow(t *testing.T) {
-	r := setupTestRouter()
+    assert_eq!(response.status(), StatusCode::OK);
 
-	// 1. Test User Registration
-	regPayload := []byte(`{"name":"Test User","email":"test@example.com","password":"password123"}`)
-	req, _ := http.NewRequest("POST", "/auth/register", bytes.NewBuffer(regPayload))
-	req.Header.Set("Content-Type", "application/json")
+    // 3. Test user registration
+    let payload = json!({
+        "name": "Integration Tester",
+        "email": "test@example.com",
+        "password": "Password123!"
+    });
 
-	w := httptest.NewRecorder()
-	r.Mux.ServeHTTP(w, req)
+    let reg_response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/auth/register")
+                .header("content-type", "application/json")
+                .body(Body::from(payload.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
 
-	if w.Code != http.StatusCreated {
-		t.Fatalf("Expected 201 Created, got %d", w.Code)
-	}
-
-	var res struct {
-		Success bool `json:"success"`
-		Item    struct {
-			Token string `json:"token"`
-		} `json:"item"`
-	}
-	_ = json.Unmarshal(w.Body.Bytes(), &res)
-
-	if !res.Success || res.Item.Token == "" {
-		t.Fatalf("Failed to retrieve token from register response")
-	}
+    assert_eq!(reg_response.status(), StatusCode::CREATED);
 }
 ```
 
 ---
 
-## 🚀 Running Tests
+## 🚀 Running Tests via Cargo
 
 ```bash
-# Run all tests in the project
-go test -v ./...
+# Run all tests in the workspace
+cargo test
 
-# Run specific package tests
-go test -v ./app/Controllers
+# Run tests with output printed to terminal
+cargo test -- --nocapture
+
+# Run a specific test by name
+cargo test test_auth_and_health_flow
 ```

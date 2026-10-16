@@ -1,83 +1,88 @@
 # 📁 File Upload & Storage Guide
 
-Padi provides a secure, high-performance file upload handler with built-in protection against malicious extensions, **MIME content sniffing** (blocks disguised executables), randomized unique filename hashing, and automatic public URL generation.
+Padi Rust Framework provides a secure, high-performance file upload handler (`padi_core::file::File`) with built-in protection against malicious file extensions, content inspection, randomized unique filename generation, and absolute public URL builders.
 
 ---
 
-## 🛠️ Handling File Uploads in Controllers
+## 🎯 Best Practice: "Relative Path in DB, Full URL in Response"
 
-File storage is managed by the **`github.com/wibiesana/padi_go_core/storage`** package (or alias **`github.com/wibiesana/padi_go_core/file`**), equivalent to `File::upload()` in the PHP version:
+`File::upload()` always returns a **relative path** (e.g., `avatars/f47ac10b58cc4372a5670e02b2c3d479.jpg`).
 
-```go
-package controllers
+1. **In Database:** Store the relative path: `avatars/f47ac10b58cc4372a5670e02b2c3d479.jpg`.
+2. **In API Responses:** Convert to an absolute URL with `File::url("avatars/f47ac10b58cc4372a5670e02b2c3d479.jpg")` or `File::url_or_null(...)`.
 
-import (
-    "net/http"
+---
 
-    "github.com/wibiesana/padi_go_core/response"
-    "github.com/wibiesana/padi_go_core/storage"
-)
+## 🛠️ Handling File Uploads in Handlers
 
-func (c *UserController) UploadAvatar(w http.ResponseWriter, r *http.Request) {
-    opts := storage.DefaultUploadOptions()
-    opts.SubDir = "avatars"
-    opts.AllowedExts = []string{"jpg", "jpeg", "png", "webp"}
-    opts.MaxSizeBytes = 5 * 1024 * 1024 // 5MB limit
+```rust
+use axum::extract::Multipart;
+use padi_core::{file::UploadOptions, prelude::*};
 
-    // 1. Upload file directly from multipart form key "avatar"
-    relPath, err := storage.Upload(r, "avatar", opts)
-    if err != nil {
-        response.UnprocessableEntity(w, err.Error(), "Upload rejected")
-        return
+pub async fn upload_avatar(mut multipart: Multipart) -> ApiResult {
+    while let Some(field) = multipart.next_field().await.map_err(|e| ApiError::bad_request(e.to_string()))? {
+        let name = field.name().unwrap_or("").to_string();
+
+        if name == "avatar" {
+            let filename = field.file_name().unwrap_or("avatar.jpg").to_string();
+            let data = field.bytes().await.map_err(|e| ApiError::bad_request(e.to_string()))?;
+
+            let uploaded_file = UploadedFile {
+                filename,
+                data: data.to_vec(),
+            };
+
+            let opts = UploadOptions {
+                sub_dir: "avatars",
+                allowed_types: &["jpg", "jpeg", "png", "webp"],
+                max_size: 5 * 1024 * 1024, // 5MB
+            };
+
+            // Saves to storage/uploads/avatars/<uuid>.<ext>
+            let rel_path = File::upload(&uploaded_file, opts)?;
+            let full_url = File::url(&rel_path);
+
+            return ok(json!({
+                "path": rel_path,
+                "url": full_url
+            }));
+        }
     }
 
-    // 2. Build absolute URL for client
-    fileURL := storage.URL(r, relPath)
-
-    response.Success(w, map[string]string{
-        "path": relPath, // Store relative path in database (e.g. avatars/20260831_abc.jpg)
-        "url":  fileURL, // Return absolute URL to client (e.g. http://localhost:8080/storage/avatars/20260831_abc.jpg)
-    }, "Avatar uploaded successfully")
+    Err(ApiError::bad_request("No avatar file provided"))
 }
 ```
 
 ---
 
-## 🖼️ Safe URL for Nullable Database Columns
+## 🖼️ Safe URL for Nullable Columns
 
-Use `storage.URLOrNull` when the file column in your database may be empty — it returns an empty string instead of a broken URL:
+Use `File::url_or_null` when the file column in your database may be empty or null — it returns an empty string instead of an invalid URL:
 
-```go
-// In your Resource / afterLoad transformer:
-photoURL := storage.URLOrNull(r, item["photo"])
-// Returns "" when photo is empty — no broken URLs in API responses
+```rust
+let photo_url = File::url_or_null(user["avatar"].as_str());
 ```
 
 ---
 
-## 📦 Storage API Reference
+## 📦 File API Reference
 
 | Function | Description |
 | :--- | :--- |
-| `storage.Upload(r, "field", opts)` | Upload a single file from `http.Request` |
-| `storage.UploadMultiple(r, "photos", opts)` | Upload multiple files from a single field |
-| `storage.SaveUploadedFile(fileHeader, opts)` | Save a `multipart.FileHeader` directly |
-| `storage.URL(r, relativePath)` | Generate absolute public URL |
-| `storage.URLOrNull(r, relativePath)` | Generate URL or empty string for empty paths |
-| `storage.Exists(relativePath)` | Check if file exists on disk |
-| `storage.Size(relativePath)` | Retrieve file size in bytes |
-| `storage.MimeType(relativePath)` | Detect MIME type of stored file |
-| `storage.Delete(relativePath)` | Remove file from storage disk |
+| `File::upload(file, opts)` | Validate, randomize name, and persist file to disk |
+| `File::url(path)` | Build absolute public URL (e.g. `http://localhost:8080/uploads/...`) |
+| `File::url_or_null(opt_path)` | Build absolute URL or return empty string if path is empty/null |
+| `File::exists(path)` | Check if file exists on disk |
+| `File::size(path)` | Get file size in bytes |
+| `File::delete(path)` | Remove file from storage disk |
+| `File::mime_type(path)` | Detect MIME type of file |
 
 ---
 
-## 🔒 Security Features
+## 🔒 Security Protections
 
-| Protection | Description |
-| :--- | :--- |
-| **Dangerous extension blacklist** | Blocks `.exe`, `.bat`, `.php`, `.sh`, `.py`, `.js`, `.dll` and more |
-| **Whitelist validation** | Only extensions in `AllowedExts` are accepted |
-| **MIME content sniffing** | Reads first 512 bytes to block PHP/shell scripts disguised as images |
-| **Randomized filenames** | Generates `YYYYMMDD_<16-byte-hex>.<ext>` to prevent enumeration attacks |
-| **Path traversal prevention** | `filepath.Clean` ensures files stay within storage directory |
-| **Size limit enforcement** | Configurable per-upload max size (default 10MB) |
+- **Dangerous Extension Blacklist:** Rejects `.php`, `.exe`, `.bat`, `.sh`, `.py`, `.js`, `.dll`, `.cgi`, `.aspx`, and more.
+- **Whitelist Enforcement:** Only files with extensions listed in `allowed_types` are accepted.
+- **Defense-in-depth Content Inspection:** Scans file content to block disguised executable scripts.
+- **Path Traversal Shield:** Sanitizes paths to guarantee files remain strictly inside `storage/uploads`.
+- **UUID Filenames:** Generates collision-free, unguessable filenames using UUID v4.
