@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🌟 Added
 
+#### Security & Sensitive Data Protection
+
+- **Automated Sensitive Column Tagging & Hiding (`generator.rs`, `user.rs`, `active_record.rs`)**:
+  - **Generator Pattern Matching (`generator.rs`)**: Enhanced sensitive column detection in model and resource generation to check for substrings containing `password`, `token`, `secret`, and `key` (e.g. `remember_token`, `access_token`, `api_token`). Generated models automatically gain `.hidden(&[...])`.
+  - **Resource Generation Safeguard (`generator.rs`)**: Generated resources automatically exclude sensitive fields from the default API representation.
+  - **`USERS` Model Security (`user.rs`)**: Added `"remember_token"` to `USERS.hidden` alongside `"password"`.
+  - **`hide_fields_value()` & `get_hidden()` (`active_record.rs`)**: Added `hide_fields_value(&self, val: Value) -> Value` to safely strip hidden fields from both a single JSON Object or an Array of Objects, alongside `get_hidden(&self)`.
+
 #### Real-time & Code Generation
 
 - **CLI Real-Time CRUD Generator Integration (`--realtime` / `-r`)**:
