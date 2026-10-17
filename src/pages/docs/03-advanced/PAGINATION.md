@@ -18,7 +18,7 @@ Padi Rust Framework provides a high-performance pagination engine built into bot
 
 ## 📦 Response Structure
 
-All paginated responses in Padi follow a deterministic format (PHP reference standard):
+All paginated responses in Padi follow a deterministic format:
 
 ```json
 {

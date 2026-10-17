@@ -19,7 +19,7 @@ Padi Rust Api Framework produces a clean, consistent response contract designed 
 
 ## 📦 Standard Response Contract
 
-Every response follows one of two predictable shapes matching the Padi standard (PHP reference):
+Every response follows one of two predictable shapes matching the Padi standard:
 
 ### 1. Single Entity Response (`item`)
 Returned by `GET /<resource>/{id}`, `POST /<resource>`, `PUT /<resource>/{id}`:
@@ -121,7 +121,7 @@ export const ProductList: React.FC = () => {
   useEffect(() => {
     api.get('/products?page=1&per_page=10')
       .then((res) => {
-        // Padi paginated responses store entities in `res.data.item.data` (matching PHP reference)
+        // Padi paginated responses store entities in `res.data.item.data`
         setProducts(res.data.item.data);
       })
       .finally(() => setLoading(false));
