@@ -26,9 +26,9 @@ Used by **Show** (`GET /<resource>/{id}`), **Store** (`POST /<resource>`), and *
 
 ```json
 {
-  "code": 200,
-  "status": "OK",
+  "success": true,
   "message": "Product retrieved successfully",
+  "message_code": "SUCCESS",
   "item": {
     "id": 1,
     "name": "Mechanical Keyboard",
@@ -36,20 +36,19 @@ Used by **Show** (`GET /<resource>/{id}`), **Store** (`POST /<resource>`), and *
     "stock": 42,
     "created_at": "2026-10-16 14:00:00",
     "updated_at": "2026-10-16 14:00:00"
-  },
-  "execution_time": "1.12ms"
+  }
 }
 ```
 
-### 2. Multiple Entities / Collections (`items`)
+### 2. Multiple Entities / Collections (`item`)
 Used by **All** (`GET /<resource>/all`):
 
 ```json
 {
-  "code": 200,
-  "status": "OK",
+  "success": true,
   "message": "Success",
-  "items": [
+  "message_code": "SUCCESS",
+  "item": [
     {
       "id": 1,
       "name": "Mechanical Keyboard",
@@ -60,33 +59,35 @@ Used by **All** (`GET /<resource>/all`):
       "name": "Wireless Mouse",
       "price": 49.99
     }
-  ],
-  "execution_time": "2.05ms"
+  ]
 }
 ```
 
-### 3. Paginated Collections (`items` + `meta`)
+### 3. Paginated Collections (`item` containing `data` + `meta`)
 Used by **Index** (`GET /<resource>?page=1&per_page=15`):
 
 ```json
 {
-  "code": 200,
-  "status": "OK",
+  "success": true,
   "message": "Success",
-  "items": [
-    {
-      "id": 1,
-      "name": "Mechanical Keyboard",
-      "price": 89.99
+  "message_code": "SUCCESS",
+  "item": {
+    "data": [
+      {
+        "id": 1,
+        "name": "Mechanical Keyboard",
+        "price": 89.99
+      }
+    ],
+    "meta": {
+      "total": 45,
+      "per_page": 15,
+      "current_page": 1,
+      "last_page": 3,
+      "from": 1,
+      "to": 15
     }
-  ],
-  "meta": {
-    "page": 1,
-    "per_page": 15,
-    "total": 45,
-    "page_count": 3
-  },
-  "execution_time": "3.14ms"
+  }
 }
 ```
 
@@ -95,15 +96,14 @@ Used when a request fails validation, authentication, or triggers an error:
 
 ```json
 {
-  "code": 422,
-  "status": "VALIDATION_FAILED",
+  "success": false,
   "message": "The given data was invalid.",
+  "message_code": "VALIDATION_FAILED",
   "errors": {
     "email": [
       "The email has already been taken."
     ]
-  },
-  "execution_time": "0.95ms"
+  }
 }
 ```
 

@@ -19,43 +19,58 @@ Padi Rust Api Framework produces a clean, consistent response contract designed 
 
 ## 📦 Standard Response Contract
 
-Every response follows one of two predictable shapes:
+Every response follows one of two predictable shapes matching the Padi standard (PHP reference):
 
 ### 1. Single Entity Response (`item`)
 Returned by `GET /<resource>/{id}`, `POST /<resource>`, `PUT /<resource>/{id}`:
 
 ```json
 {
-  "code": 200,
-  "status": "OK",
+  "success": true,
   "message": "Product retrieved successfully",
+  "message_code": "SUCCESS",
   "item": {
     "id": 1,
     "name": "Mechanical Keyboard",
     "price": 89.99
-  },
-  "execution_time": "1.10ms"
+  }
 }
 ```
 
-### 2. Collection / Paginated Response (`items` & `meta`)
-Returned by `GET /<resource>?page=1&per_page=15` and `GET /<resource>/all`:
+### 2. Collection / Paginated Response (`item` with `data` + `meta`)
+Returned by `GET /<resource>?page=1&per_page=15` (paginated) and `GET /<resource>/all` (flat list):
 
+**Paginated:**
 ```json
 {
-  "code": 200,
-  "status": "OK",
+  "success": true,
   "message": "Success",
-  "items": [
+  "message_code": "SUCCESS",
+  "item": {
+    "data": [
+      { "id": 1, "name": "Mechanical Keyboard", "price": 89.99 }
+    ],
+    "meta": {
+      "total": 50,
+      "per_page": 15,
+      "current_page": 1,
+      "last_page": 4,
+      "from": 1,
+      "to": 15
+    }
+  }
+}
+```
+
+**Unpaginated Collection (`/all`):**
+```json
+{
+  "success": true,
+  "message": "Success",
+  "message_code": "SUCCESS",
+  "item": [
     { "id": 1, "name": "Mechanical Keyboard", "price": 89.99 }
-  ],
-  "meta": {
-    "page": 1,
-    "per_page": 15,
-    "total": 50,
-    "page_count": 4
-  },
-  "execution_time": "1.75ms"
+  ]
 }
 ```
 
@@ -106,8 +121,8 @@ export const ProductList: React.FC = () => {
   useEffect(() => {
     api.get('/products?page=1&per_page=10')
       .then((res) => {
-        // Padi paginated responses store entities in `res.data.items`
-        setProducts(res.data.items);
+        // Padi paginated responses store entities in `res.data.item.data` (matching PHP reference)
+        setProducts(res.data.item.data);
       })
       .finally(() => setLoading(false));
   }, []);

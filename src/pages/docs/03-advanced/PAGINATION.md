@@ -18,32 +18,35 @@ Padi Rust Framework provides a high-performance pagination engine built into bot
 
 ## 📦 Response Structure
 
-All paginated responses in Padi follow a deterministic format:
+All paginated responses in Padi follow a deterministic format (PHP reference standard):
 
 ```json
 {
-  "code": 200,
-  "status": "OK",
+  "success": true,
   "message": "Success",
-  "items": [
-    {
-      "id": 1,
-      "name": "Mechanical Keyboard",
-      "price": 89.99
-    },
-    {
-      "id": 2,
-      "name": "Wireless Mouse",
-      "price": 49.99
+  "message_code": "SUCCESS",
+  "item": {
+    "data": [
+      {
+        "id": 1,
+        "name": "Mechanical Keyboard",
+        "price": 89.99
+      },
+      {
+        "id": 2,
+        "name": "Wireless Mouse",
+        "price": 49.99
+      }
+    ],
+    "meta": {
+      "total": 50,
+      "per_page": 15,
+      "current_page": 1,
+      "last_page": 4,
+      "from": 1,
+      "to": 15
     }
-  ],
-  "meta": {
-    "page": 1,
-    "per_page": 15,
-    "total": 50,
-    "page_count": 4
-  },
-  "execution_time": "1.85ms"
+  }
 }
 ```
 
