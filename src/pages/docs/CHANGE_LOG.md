@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.0.1] - 2026-10-27
+
+### 🛡️ Robust Input Stream Validation & Cache Concurrency Hardening (`request.rs`, `cache.rs`)
+
+- **JSON Payload Stream Validation & Body Extractor Safety (`request.rs`)**:
+  - Validated that `axum::body::Bytes` gracefully handles dropped connections and stream EOF as `ApiError::bad_request("Unable to read request body")`.
+  - Empty and whitespace-only payloads (`bytes.iter().all(|b| b.is_ascii_whitespace())`) are cleanly extracted as empty JSON objects (`{}`), ensuring controllers and auth endpoints return clean 422 Unprocessable Entity responses rather than uncaught errors.
+  - `Request::new()` and `Request::all()` safely handle malformed or non-object payloads with `Value::Null` fallbacks.
+
+- **Atomic File Stream Decoding & Concurrency Hardening (`cache.rs`)**:
+  - **Zero-Byte File Pruning**: Added explicit `raw.trim().is_empty()` detection in `file_read_entry()`, instantly purging empty or interrupted file cache writes from disk and returning a clean miss (`None`).
+  - **Collision-Proof Temp Files**: Upgraded `file_write()` temporary filenames to include both process ID and atomic sequence numbers (`{path}.tmp.{pid}.{seq}`), eliminating concurrent write collisions across multi-threaded asynchronous tasks.
+  - **Numeric Type Support in `increment()` / `decrement()`**: Enhanced `increment()` to safely parse float (`f64`), integer (`i64`), and string-encoded numbers, defaulting cleanly to `(0, 0)` on uninitialized keys without panics.
+
 ## [1.0.0] - 2026-10-22
 
 ### 🌟 Added
